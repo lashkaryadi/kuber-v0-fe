@@ -148,21 +148,25 @@ export const SellInventoryDialog: React.FC<SellInventoryDialogProps> = ({
     // Validate each selected shape
     for (const shape of sellShapes) {
       if (shape.selected) {
-        // Allow selling by weight only OR pieces only (not both mandatory)
-        const hasPieces = shape.sellPieces > 0;
-        const hasWeight = shape.sellWeight > 0;
+        // Convert empty/zero values
+        const piecesToSell = shape.sellPieces || 0;
+        const weightToSell = shape.sellWeight || 0;
 
-        if (!hasPieces && !hasWeight) {
-          toast.error(`Please enter either pieces or weight for ${shape.shape}`);
+        // Check if at least weight is provided (pieces can be 0)
+        if (weightToSell <= 0) {
+          toast.error(`Please enter weight to sell for ${shape.shape}`);
           return false;
         }
 
-        if (hasPieces && shape.sellPieces > shape.availablePieces) {
-          toast.error(`Cannot sell ${shape.sellPieces} pieces of ${shape.shape} - only ${shape.availablePieces} available`);
+        // If pieces are provided, validate against available
+        if (piecesToSell > 0 && piecesToSell > shape.availablePieces) {
+          toast.error(`Cannot sell ${piecesToSell} pieces of ${shape.shape} - only ${shape.availablePieces} available`);
           return false;
         }
-        if (hasWeight && shape.sellWeight > shape.availableWeight) {
-          toast.error(`Cannot sell ${shape.sellWeight} ct of ${shape.shape} - only ${shape.availableWeight} ct available`);
+        
+        // Validate weight
+        if (weightToSell > shape.availableWeight) {
+          toast.error(`Cannot sell ${weightToSell.toFixed(2)} ct of ${shape.shape} - only ${shape.availableWeight.toFixed(2)} ct available`);
           return false;
         }
       }
@@ -180,7 +184,7 @@ export const SellInventoryDialog: React.FC<SellInventoryDialogProps> = ({
 
     try {
       const selectedShapes = sellShapes
-        .filter(shape => shape.selected && (shape.sellPieces > 0 || shape.sellWeight > 0))
+        .filter(shape => shape.selected && shape.sellWeight > 0) // Only require weight now
         .map(shape => ({
           shape: shape.shape,
           pieces: shape.sellPieces,
@@ -270,14 +274,15 @@ export const SellInventoryDialog: React.FC<SellInventoryDialogProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                       <div>
                         <Label htmlFor={`pieces-${index}`} className="text-xs text-muted-foreground">
-                          Pieces (Available: {shape.availablePieces})
+                          Pieces <span className="text-xs text-gray-400">(Optional - Available: {shape.availablePieces})</span>
                         </Label>
                         <Input
                           id={`pieces-${index}`}
                           type="number"
                           min="0"
                           max={shape.availablePieces}
-                          value={shape.selected ? shape.sellPieces : 0}
+                          placeholder="0"
+                          value={shape.selected ? shape.sellPieces : ''}
                           onChange={(e) => handlePiecesChange(index, e.target.value)}
                           disabled={!shape.selected}
                         />
@@ -285,7 +290,7 @@ export const SellInventoryDialog: React.FC<SellInventoryDialogProps> = ({
 
                       <div>
                         <Label htmlFor={`weight-${index}`} className="text-xs text-muted-foreground">
-                          Weight (Available: {shape.availableWeight.toFixed(2)} ct)
+                          Weight (Required - Available: {shape.availableWeight.toFixed(2)} ct)
                         </Label>
                         <Input
                           id={`weight-${index}`}
@@ -293,7 +298,8 @@ export const SellInventoryDialog: React.FC<SellInventoryDialogProps> = ({
                           step="0.01"
                           min="0"
                           max={shape.availableWeight}
-                          value={shape.selected ? shape.sellWeight : 0}
+                          placeholder="0.00"
+                          value={shape.selected ? shape.sellWeight : ''}
                           onChange={(e) => handleWeightChange(index, e.target.value)}
                           disabled={!shape.selected}
                         />
