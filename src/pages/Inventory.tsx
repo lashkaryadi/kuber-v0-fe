@@ -10,6 +10,7 @@ import {
   List,
   QrCode,
   ScanLine,
+  Pill,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,7 @@ import { InventoryTable } from "@/components/inventory/InventoryTable";
 import { InventoryCardView } from "@/components/inventory/InventoryCardView";
 import { AddInventoryDialog } from "@/components/inventory/AddInventoryDialog";
 import { QRScannerDialog } from "@/components/inventory/QRScannerDialog";
+import { TallyScanningDialog } from "@/components/inventory/TallyScanningDialog";
 import { InventoryItem, CUTTING_STYLES, CuttingStyleCode } from "@/types/inventory";
 import { toast } from "sonner";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -57,6 +59,9 @@ export const Inventory = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isSeriesTallyOpen, setIsSeriesTallyOpen] = useState(false);
+  const [selectedSeriesId, setSelectedSeriesId] = useState<string | null>(null);
+  const [selectedSeriesName, setSelectedSeriesName] = useState<string>("");
 
   // Fetch categories, shapes, series on mount
   useEffect(() => {
@@ -258,9 +263,31 @@ export const Inventory = () => {
               variant="outline"
               onClick={handleExport}
               className="border-input hover:bg-accent hover:text-accent-foreground"
+              title="Export all inventory items as Excel spreadsheet"
             >
               <Download className="w-4 h-4 mr-2" />
               Export Excel{hasActiveFilters ? ` (${totalItems} items)` : ''}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  const params = getFilterParams();
+                  await api.exportInventoryExcelWithQR(params);
+                  toast.success(
+                    hasActiveFilters
+                      ? `Exported ${totalItems} items with QR codes`
+                      : "All inventory exported with QR codes"
+                  );
+                } catch {
+                  toast.error("Failed to export with QR codes");
+                }
+              }}
+              title="Export inventory with embedded QR codes"
+            >
+              <QrCode className="w-4 h-4 mr-1" />
+              Excel + QR
             </Button>
             <Button
               variant="secondary"
@@ -311,6 +338,28 @@ export const Inventory = () => {
             >
               <ScanLine className="w-4 h-4 mr-1" />
               Scan
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (seriesList.length === 0) {
+                  toast.error("No series available");
+                  return;
+                }
+                if (seriesList.length === 1) {
+                  setSelectedSeriesId(seriesList[0]._id);
+                  setSelectedSeriesName(seriesList[0].name);
+                  setIsSeriesTallyOpen(true);
+                } else {
+                  // Show series selection dialog
+                  setIsSeriesTallyOpen(true);
+                }
+              }}
+              title="Start series tally and inventory scan"
+            >
+              <Pill className="w-4 h-4 mr-1" />
+              Series Tally
             </Button>
             <input
               ref={csvInputRef}
@@ -602,6 +651,53 @@ export const Inventory = () => {
           open={isScannerOpen}
           onOpenChange={setIsScannerOpen}
         />
+
+        {/* Series Tally Dialog */}
+        {selectedSeriesId && (
+          <TallyScanningDialog
+            open={isSeriesTallyOpen}
+            onOpenChange={(open) => {
+              setIsSeriesTallyOpen(open);
+              if (!open) {
+                setSelectedSeriesId(null);
+                setSelectedSeriesName("");
+              }
+            }}
+            seriesId={selectedSeriesId}
+            seriesName={selectedSeriesName}
+          />
+        )}
+
+        {/* Series Selection Dialog (when no series selected but tally open) */}
+        {!selectedSeriesId && isSeriesTallyOpen && seriesList.length > 0 && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-slate-950 rounded-lg shadow-lg p-6 max-w-md w-full mx-4">
+              <h2 className="text-lg font-semibold mb-4">Select Series for Tally</h2>
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {seriesList.map((series) => (
+                  <button
+                    key={series._id}
+                    onClick={() => {
+                      setSelectedSeriesId(series._id);
+                      setSelectedSeriesName(series.name);
+                    }}
+                    className="w-full text-left p-3 border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-900 transition"
+                  >
+                    <div className="font-medium">{series.name}</div>
+                    <div className="text-sm text-muted-foreground">{series._id}</div>
+                  </button>
+                ))}
+              </div>
+              <Button
+                variant="outline"
+                className="w-full mt-4"
+                onClick={() => setIsSeriesTallyOpen(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </MainLayout>
   );

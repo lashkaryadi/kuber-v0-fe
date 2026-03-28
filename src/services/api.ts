@@ -1095,6 +1095,91 @@ const downloadQRLabelsPDF = async (params?: Record<string, any>) => {
   }
 };
 
+const exportInventoryExcelWithQR = async (params?: Record<string, any>) => {
+  try {
+    const response = await apiClient.get('/api/inventory/export/excel-qr', {
+      responseType: 'blob',
+      params,
+    });
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'inventory_with_qr.xlsx');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    return { success: true };
+  } catch (error) {
+    console.error('Error exporting Excel with QR:', error);
+    return { success: false };
+  }
+};
+
+const displayItemQR = async (itemId: string) => {
+  try {
+    const response = await apiClient.get(`/api/inventory/qr/display/${itemId}`);
+    return response.data;
+  } catch (error: unknown) {
+    console.error('Error fetching item QR display:', error);
+    const err = error as any;
+    return {
+      success: false,
+      message: err?.response?.data?.message || 'Failed to fetch QR display'
+    };
+  }
+};
+
+const downloadSeriesQRLabelPDF = async (seriesId: string) => {
+  try {
+    const response = await apiClient.get(`/api/inventory/series/${seriesId}/qr-label`, {
+      responseType: 'blob'
+    });
+    const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `series-${seriesId}-qr-label.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode?.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    return { success: true };
+  } catch (error) {
+    console.error('Error downloading series QR label:', error);
+    return { success: false };
+  }
+};
+
+const getSeriesForTally = async (seriesId: string) => {
+  try {
+    const response = await apiClient.get(`/api/inventory/series/${seriesId}/tally-data`);
+    return response.data;
+  } catch (error: unknown) {
+    console.error('Error fetching series for tally:', error);
+    const err = error as any;
+    return {
+      success: false,
+      message: err?.response?.data?.message || 'Failed to fetch series'
+    };
+  }
+};
+
+const processTallyScan = async (seriesId: string, scannedItems: Array<{ id: string; sn?: string }>) => {
+  try {
+    const response = await apiClient.post(`/api/inventory/series/${seriesId}/tally-scan`, {
+      scannedItems
+    });
+    return response.data;
+  } catch (error: unknown) {
+    console.error('Error processing tally scan:', error);
+    const err = error as any;
+    return {
+      success: false,
+      message: err?.response?.data?.message || 'Failed to process tally scan'
+    };
+  }
+};
+
 /* ============================
    AUDIT LOGS
 ============================ */
@@ -1214,6 +1299,11 @@ const api = {
   downloadCSVTemplate,
   getItemQRUrl,
   downloadQRLabelsPDF,
+  exportInventoryExcelWithQR,
+  displayItemQR,
+  downloadSeriesQRLabelPDF,
+  getSeriesForTally,
+  processTallyScan,
 
   // Categories & Shapes
   getCategories,
