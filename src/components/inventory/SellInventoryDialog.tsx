@@ -148,16 +148,21 @@ export const SellInventoryDialog: React.FC<SellInventoryDialogProps> = ({
     // Validate each selected shape
     for (const shape of sellShapes) {
       if (shape.selected) {
-        if (shape.sellPieces > shape.availablePieces) {
+        // Allow selling by weight only OR pieces only (not both mandatory)
+        const hasPieces = shape.sellPieces > 0;
+        const hasWeight = shape.sellWeight > 0;
+
+        if (!hasPieces && !hasWeight) {
+          toast.error(`Please enter either pieces or weight for ${shape.shape}`);
+          return false;
+        }
+
+        if (hasPieces && shape.sellPieces > shape.availablePieces) {
           toast.error(`Cannot sell ${shape.sellPieces} pieces of ${shape.shape} - only ${shape.availablePieces} available`);
           return false;
         }
-        if (shape.sellWeight > shape.availableWeight) {
+        if (hasWeight && shape.sellWeight > shape.availableWeight) {
           toast.error(`Cannot sell ${shape.sellWeight} ct of ${shape.shape} - only ${shape.availableWeight} ct available`);
-          return false;
-        }
-        if (shape.sellPieces <= 0 || shape.sellWeight <= 0) {
-          toast.error(`Please enter valid quantities for ${shape.shape}`);
           return false;
         }
       }
