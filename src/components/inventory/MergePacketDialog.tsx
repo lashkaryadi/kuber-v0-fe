@@ -128,7 +128,7 @@ export const MergePacketDialog: React.FC<MergePacketDialogProps> = ({
             <p className="text-sm font-medium text-orange-800">Source (will be deleted)</p>
             <div className="text-sm mt-1 space-y-1">
               <p><strong>{sourceItem.serialNumber}</strong> - {sourceItem.category?.name || 'N/A'}</p>
-              <p>Pieces: {sourceItem.totalPieces} | Weight: {sourceItem.totalWeight.toFixed(2)} ct</p>
+              <p>Pieces: {sourceItem.totalPieces} | Weight: {(sourceItem.totalWeight || 0).toFixed(2)} ct</p>
             </div>
           </div>
 
@@ -162,7 +162,7 @@ export const MergePacketDialog: React.FC<MergePacketDialogProps> = ({
                     </p>
                     <p className="text-sm text-muted-foreground">
                       Pieces: {candidate.availablePieces}/{candidate.totalPieces} |
-                      Weight: {candidate.availableWeight.toFixed(2)}/{candidate.totalWeight.toFixed(2)} ct
+                      Weight: {(candidate.availableWeight || 0).toFixed(2)}/{(candidate.totalWeight || 0).toFixed(2)} ct
                     </p>
                   </div>
                   <Badge variant="outline" className="text-xs">

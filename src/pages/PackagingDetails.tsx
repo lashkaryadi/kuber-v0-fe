@@ -248,7 +248,7 @@ export default function PackagingDetails() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Total Weight</span>
-                    <span className="font-medium text-foreground">{totalWeight.toFixed(2)}</span>
+                    <span className="font-medium text-foreground">{(totalWeight || 0).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Total Pieces</span>

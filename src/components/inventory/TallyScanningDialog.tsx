@@ -91,8 +91,18 @@ export const TallyScanningDialog: React.FC<TallyScanningDialogProps> = ({
 
   const startScanner = async () => {
     try {
-      // Wait for DOM to be ready before initializing
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Query the DOM element multiple times to ensure it exists
+      let element = document.getElementById('tally-qr-reader');
+      let attempts = 0;
+      while (!element && attempts < 10) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        element = document.getElementById('tally-qr-reader');
+        attempts++;
+      }
+
+      if (!element) {
+        throw new Error('QR reader element not found');
+      }
 
       const scanner = new Html5Qrcode('tally-qr-reader');
       scannerRef.current = scanner;
@@ -117,10 +127,12 @@ export const TallyScanningDialog: React.FC<TallyScanningDialogProps> = ({
       console.error('Failed to start scanner:', err);
       let errorMessage = 'Could not access camera. Please check permissions.';
 
-      if (err.name === 'NotAllowedError' || err.message?.includes('Permission denied')) {
-        errorMessage = 'Camera permission denied. Please allow camera access.';
-      } else if (err.name === 'NotFoundError') {
+      if (err.name === 'NotAllowedError' || err.message?.includes('Permission denied') || err.message?.includes('Unknown error')) {
+        errorMessage = 'Camera permission denied. Please allow camera access in settings.';
+      } else if (err.name === 'NotFoundError' || err.message?.includes('Requested device not found')) {
         errorMessage = 'No camera found on this device.';
+      } else if (err.message?.includes('not available')) {
+        errorMessage = 'Camera is not available. Ensure you are using HTTPS.';
       }
 
       setError(errorMessage);

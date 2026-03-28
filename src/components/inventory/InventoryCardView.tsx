@@ -159,9 +159,9 @@ export const InventoryCardView: React.FC<InventoryCardViewProps> = ({
                 <span>
                   <span className="text-muted-foreground">Wt: </span>
                   <span className={item.availableWeight < item.totalWeight ? 'text-orange-600 font-medium' : 'font-medium'}>
-                    {item.availableWeight.toFixed(2)}
+                    {(item.availableWeight || 0).toFixed(2)}
                   </span>
-                  <span className="text-muted-foreground">/{item.totalWeight.toFixed(2)} ct</span>
+                  <span className="text-muted-foreground">/{(item.totalWeight || 0).toFixed(2)} ct</span>
                 </span>
                 <span>
                   <span className="text-muted-foreground">Pcs: </span>

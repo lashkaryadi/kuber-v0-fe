@@ -75,7 +75,7 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({
       return item.singleShape || 'N/A';
     }
     if (item.shapes && item.shapes.length > 0) {
-      return item.shapes.map(s => `${s.shape} (${s.pieces}pc, ${s.weight.toFixed(2)}ct)`).join(', ');
+      return item.shapes.map(s => `${s.shape} (${s.pieces}pc, ${(s.weight || 0).toFixed(2)}ct)`).join(', ');
     }
     return 'N/A';
   };
@@ -154,8 +154,8 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Field label="Total Pieces" value={item.totalPieces} />
               <Field label="Available Pieces" value={item.availablePieces} />
-              <Field label="Total Weight" value={`${item.totalWeight.toFixed(2)} ct`} />
-              <Field label="Available Weight" value={`${item.availableWeight.toFixed(2)} ct`} />
+              <Field label="Total Weight" value={`${(item.totalWeight || 0).toFixed(2)} ct`} />
+              <Field label="Available Weight" value={`${(item.availableWeight || 0).toFixed(2)} ct`} />
             </div>
           </div>
 

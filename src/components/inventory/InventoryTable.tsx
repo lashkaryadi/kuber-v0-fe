@@ -272,10 +272,10 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                   </td>
                   <td className="p-4 align-middle">
                     <span className={item.availableWeight < item.totalWeight ? 'text-orange-600' : ''}>
-                      {item.availableWeight.toFixed(2)}
+                      {(item.availableWeight || 0).toFixed(2)}
                     </span>
                     {' / '}
-                    {item.totalWeight.toFixed(2)}
+                    {(item.totalWeight || 0).toFixed(2)}
                   </td>
                   <td className="p-4 align-middle text-sm text-muted-foreground">
                     {formatDimensions(item)}
