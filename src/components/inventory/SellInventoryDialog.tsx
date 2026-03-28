@@ -152,9 +152,9 @@ export const SellInventoryDialog: React.FC<SellInventoryDialogProps> = ({
         const piecesToSell = shape.sellPieces || 0;
         const weightToSell = shape.sellWeight || 0;
 
-        // Check if at least weight is provided (pieces can be 0)
-        if (weightToSell <= 0) {
-          toast.error(`Please enter weight to sell for ${shape.shape}`);
+        // At least one of pieces or weight must be > 0
+        if (piecesToSell <= 0 && weightToSell <= 0) {
+          toast.error(`Please enter either pieces or weight for ${shape.shape}`);
           return false;
         }
 
@@ -164,8 +164,8 @@ export const SellInventoryDialog: React.FC<SellInventoryDialogProps> = ({
           return false;
         }
         
-        // Validate weight
-        if (weightToSell > shape.availableWeight) {
+        // If weight is provided, validate against available
+        if (weightToSell > 0 && weightToSell > shape.availableWeight) {
           toast.error(`Cannot sell ${weightToSell.toFixed(2)} ct of ${shape.shape} - only ${shape.availableWeight.toFixed(2)} ct available`);
           return false;
         }
@@ -184,7 +184,7 @@ export const SellInventoryDialog: React.FC<SellInventoryDialogProps> = ({
 
     try {
       const selectedShapes = sellShapes
-        .filter(shape => shape.selected && shape.sellWeight > 0) // Only require weight now
+        .filter(shape => shape.selected && (shape.sellPieces > 0 || shape.sellWeight > 0)) // Allow either pieces or weight
         .map(shape => ({
           shape: shape.shape,
           pieces: shape.sellPieces,
@@ -263,6 +263,7 @@ export const SellInventoryDialog: React.FC<SellInventoryDialogProps> = ({
                     id={`shape-${index}`}
                     checked={shape.selected}
                     onCheckedChange={(checked) => handleShapeSelection(index, !!checked)}
+                    disabled={sellShapes.length === 1} // Disable checkbox if only one shape (auto-selected)
                     className="mt-1"
                   />
 
@@ -414,7 +415,7 @@ export const SellInventoryDialog: React.FC<SellInventoryDialogProps> = ({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || totalSold.pieces === 0}>
+            <Button type="submit" disabled={loading || (totalSold.pieces === 0 && totalSold.weight === 0)}>
               {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {loading ? 'Processing...' : 'Complete Sale'}
             </Button>
