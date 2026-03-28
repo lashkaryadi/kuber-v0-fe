@@ -46,33 +46,46 @@ export const QRScannerDialog: React.FC<QRScannerDialogProps> = ({
 
   const startScanner = async () => {
     try {
-      // Query the DOM element multiple times to ensure it exists
+      // Query the DOM element with multiple retries
       let element = document.getElementById('qr-reader');
       let attempts = 0;
-      while (!element && attempts < 10) {
+      const maxAttempts = 20; // 2 seconds total
+      
+      while (!element && attempts < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, 100));
         element = document.getElementById('qr-reader');
         attempts++;
       }
 
       if (!element) {
-        throw new Error('QR reader element not found');
+        // Don't throw - just log and return gracefully
+        console.error('QR reader element still not found after retries');
+        setError('Camera setup failed. Please close and reopen the dialog.');
+        return;
       }
 
       const scanner = new Html5Qrcode('qr-reader');
       scannerRef.current = scanner;
 
+      // Use smaller, adaptive qrbox to avoid canvas errors on mobile
+      const qrboxSize = Math.min(window.innerWidth * 0.6, 150); // 60% of viewport or 150px max
+
       await scanner.start(
         { facingMode: 'environment' },
         {
           fps: 10,
-          qrbox: { width: 250, height: 250 },
+          qrbox: { width: qrboxSize, height: qrboxSize },
+          aspectRatio: 1.0,
+          disableFlip: false,
         },
         handleScanSuccess,
         (errorMessage: string) => {
-          // Ignore "QR code not found" errors
-          if (!errorMessage?.includes('NotFoundException')) {
-            console.debug('Scan error:', errorMessage);
+          // Suppress all non-critical errors to avoid cluttering console
+          // Only log unexpected errors
+          if (errorMessage?.includes('NotFoundException') || 
+              errorMessage?.includes('Not found') ||
+              errorMessage?.includes('IndexSizeError')) {
+            return; // Expected errors during scanning or video initialization
           }
         }
       );
@@ -98,9 +111,13 @@ export const QRScannerDialog: React.FC<QRScannerDialogProps> = ({
   useEffect(() => {
     if (!open) return;
 
-    startScanner();
+    // Delay scanner start to allow dialog to fully render
+    const timer = setTimeout(() => {
+      startScanner();
+    }, 500);
 
     return () => {
+      clearTimeout(timer);
       stopScanner();
     };
   }, [open]);
@@ -110,27 +127,45 @@ export const QRScannerDialog: React.FC<QRScannerDialogProps> = ({
     await stopScanner();
 
     try {
-      const parsed = JSON.parse(decodedText);
-      const itemId = parsed.id;
+      console.log('QR Scanned raw:', decodedText);
+      
+      let itemId: string | null = null;
+      let serialNumber: string | null = null;
+
+      try {
+        // Try parsing as JSON first
+        const parsed = JSON.parse(decodedText);
+        itemId = parsed.id;
+        serialNumber = parsed.sn;
+        console.log('QR parsed JSON:', { itemId, serialNumber });
+      } catch (e) {
+        // If not JSON, try treating it as plain ID
+        itemId = decodedText.trim();
+        console.log('QR treated as plain ID:', itemId);
+      }
 
       if (!itemId) {
-        toast.error('Invalid QR code format');
+        toast.error('Invalid QR code format - no ID found');
         setTimeout(() => startScanner(), 500);
         return;
       }
 
+      toast.loading('Fetching item details...');
       const response = await api.getInventoryById(itemId);
+      console.log('API response:', response);
+      
       if (response.success && response.data) {
         setFoundItem(response.data);
         setDetailOpen(true);
         toast.success(`Found: ${response.data.serialNumber}`);
       } else {
-        toast.error('Item not found');
+        console.error('No data in response:', response);
+        toast.error(response.message || 'Item not found');
         setTimeout(() => startScanner(), 500);
       }
     } catch (error) {
-      console.error('Parse error:', error);
-      toast.error('Invalid QR code');
+      console.error('QR scan error:', error);
+      toast.error('Failed to process QR code');
       setTimeout(() => startScanner(), 500);
     }
   };

@@ -52,7 +52,11 @@ export const TallyScanningDialog: React.FC<TallyScanningDialogProps> = ({
   useEffect(() => {
     if (open) {
       loadSeriesData();
-      startScanner();
+      // Delay scanner start to allow dialog to fully render
+      const timer = setTimeout(() => {
+        startScanner();
+      }, 500);
+      return () => clearTimeout(timer);
     }
     return () => {
       stopScanner();
@@ -91,33 +95,46 @@ export const TallyScanningDialog: React.FC<TallyScanningDialogProps> = ({
 
   const startScanner = async () => {
     try {
-      // Query the DOM element multiple times to ensure it exists
+      // Query the DOM element with multiple retries
       let element = document.getElementById('tally-qr-reader');
       let attempts = 0;
-      while (!element && attempts < 10) {
+      const maxAttempts = 20; // 2 seconds total
+      
+      while (!element && attempts < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, 100));
         element = document.getElementById('tally-qr-reader');
         attempts++;
       }
 
       if (!element) {
-        throw new Error('QR reader element not found');
+        // Don't throw - just log and return gracefully
+        console.error('QR reader element still not found after retries');
+        setError('Camera setup failed. Please close and reopen the dialog.');
+        return;
       }
 
       const scanner = new Html5Qrcode('tally-qr-reader');
       scannerRef.current = scanner;
 
+      // Use smaller, adaptive qrbox to avoid canvas errors on mobile
+      const qrboxSize = Math.min(window.innerWidth * 0.6, 150); // 60% of viewport or 150px max
+
       await scanner.start(
         { facingMode: 'environment' },
         {
           fps: 10,
-          qrbox: { width: 250, height: 250 },
+          qrbox: { width: qrboxSize, height: qrboxSize },
+          aspectRatio: 1.0,
+          disableFlip: false,
         },
         handleScanSuccess,
         (errorMessage: string) => {
-          // Ignore "QR code not found" errors
-          if (!errorMessage?.includes('NotFoundException')) {
-            console.debug('Scan error:', errorMessage);
+          // Suppress all non-critical errors to avoid cluttering console
+          // Only log unexpected errors
+          if (errorMessage?.includes('NotFoundException') || 
+              errorMessage?.includes('Not found') ||
+              errorMessage?.includes('IndexSizeError')) {
+            return; // Expected errors during scanning or video initialization
           }
         }
       );
