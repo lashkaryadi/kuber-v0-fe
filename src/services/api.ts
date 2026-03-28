@@ -421,6 +421,19 @@ const getShapes = async () => {
   }
 };
 
+const getMineNames = async () => {
+  try {
+    const response = await apiClient.get("/api/inventory/mines");
+    return {
+      success: true,
+      data: response.data?.data || []
+    };
+  } catch (error) {
+    console.error("Error fetching mine names:", error);
+    return { success: false, data: [] };
+  }
+};
+
 const createShape = async (payload: any) => {
   try {
     const response = await apiClient.post("/api/shapes", payload);
@@ -1002,9 +1015,10 @@ const downloadInvoicePDF = async (invoiceId: string) => {
 /* ============================
    EXPORT INVENTORY
 ============================ */
-const exportInventoryExcel = async () => {
+const exportInventoryExcel = async (params?: Record<string, any>) => {
   const res = await apiClient.get('/api/inventory/export/excel', {
     responseType: 'blob',
+    params,
   });
 
   const url = window.URL.createObjectURL(new Blob([res.data]));
@@ -1034,6 +1048,50 @@ const importInventoryCSV = async (file: File) => {
       message: err?.response?.data?.message || err.message,
       data: null,
     };
+  }
+};
+
+const downloadCSVTemplate = async () => {
+  try {
+    const response = await apiClient.get("/api/inventory/template/csv", {
+      responseType: "blob",
+    });
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "inventory-template.csv");
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode?.removeChild(link);
+    return { success: true };
+  } catch (error) {
+    console.error("Error downloading CSV template:", error);
+    return { success: false };
+  }
+};
+
+const getItemQRUrl = (itemId: string) => {
+  return `${BASE_URL}/api/inventory/qr/${itemId}`;
+};
+
+const downloadQRLabelsPDF = async (params?: Record<string, any>) => {
+  try {
+    const response = await apiClient.get("/api/inventory/qr/labels", {
+      params,
+      responseType: "blob",
+    });
+    const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "qr-labels.pdf");
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode?.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    return { success: true };
+  } catch (error) {
+    console.error("Error downloading QR labels:", error);
+    return { success: false };
   }
 };
 
@@ -1153,6 +1211,9 @@ const api = {
   deleteInventoryItem,
   exportInventoryExcel,
   importInventoryCSV,
+  downloadCSVTemplate,
+  getItemQRUrl,
+  downloadQRLabelsPDF,
 
   // Categories & Shapes
   getCategories,
@@ -1163,6 +1224,7 @@ const api = {
   getShapes,
   createShape,
   getInventoryShapes,
+  getMineNames,
 
   // Series
   getSeries,

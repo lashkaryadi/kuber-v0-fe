@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,6 +62,7 @@ interface FormData {
   };
   certification: string;
   location: string;
+  mineName: string;
   status: string;
   description: string;
   images: string[];
@@ -94,6 +95,7 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
     },
     certification: '',
     location: '',
+    mineName: '',
     status: 'in_stock',
     description: '',
     images: []
@@ -104,11 +106,21 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
   const [seriesList, setSeriesList] = useState<SeriesItem[]>([]);
   const [newSeriesName, setNewSeriesName] = useState('');
   const [showNewSeries, setShowNewSeries] = useState(false);
+  const [mineNames, setMineNames] = useState<string[]>([]);
+  const [showNewMine, setShowNewMine] = useState(false);
+  const [newMineName, setNewMineName] = useState('');
 
-  // Fetch series list
+  // Ref to hold pending shape data for deferred injection
+  const pendingShapeRef = useRef<{
+    singleShape: string;
+    shapes: ShapeFormEntry[];
+  } | null>(null);
+
+  // Fetch series list and mine names
   useEffect(() => {
     if (open) {
       fetchSeries();
+      fetchMineNames();
     }
   }, [open]);
 
@@ -116,6 +128,13 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
     const response = await api.getSeries({ limit: 100 });
     if (response.success) {
       setSeriesList(response.data);
+    }
+  };
+
+  const fetchMineNames = async () => {
+    const response = await api.getMineNames();
+    if (response.success) {
+      setMineNames(response.data);
     }
   };
 
@@ -136,28 +155,42 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
   };
 
   // Reset or populate form when dialog opens/closes or editItem changes
+  // CRITICAL: Two-phase population for edit mode.
+  // Phase 1: Set everything EXCEPT shape values (lot type renders correct selector)
+  // Phase 2: After lot type render completes, inject saved shape values
   useEffect(() => {
     if (open) {
       if (editItem) {
+        // Phase 1: Set all fields, but leave shapes empty so ShapeSelector
+        // mounts with the correct isSingleShape prop first
+        const savedSingleShape = editItem.singleShape || '';
+        const savedShapes = (editItem.shapes || []).map(s => ({
+          shape: s.shape,
+          pieces: s.pieces,
+          weight: s.weight,
+          dimensionMin: {
+            length: String(s.dimensionMin?.length || ''),
+            width: String(s.dimensionMin?.width || '')
+          },
+          dimensionMax: {
+            length: String(s.dimensionMax?.length || ''),
+            width: String(s.dimensionMax?.width || '')
+          }
+        }));
+
+        // Store shape data for deferred injection
+        pendingShapeRef.current = {
+          singleShape: savedSingleShape,
+          shapes: savedShapes,
+        };
+
         setFormData({
           category: editItem.category?._id || '',
           cuttingStyle: editItem.cuttingStyle || '',
           series: editItem.series?._id || '',
           shapeType: editItem.shapeType,
-          singleShape: editItem.singleShape || '',
-          shapes: (editItem.shapes || []).map(s => ({
-            shape: s.shape,
-            pieces: s.pieces,
-            weight: s.weight,
-            dimensionMin: {
-              length: String(s.dimensionMin?.length || ''),
-              width: String(s.dimensionMin?.width || '')
-            },
-            dimensionMax: {
-              length: String(s.dimensionMax?.length || ''),
-              width: String(s.dimensionMax?.width || '')
-            }
-          })),
+          singleShape: '',   // intentionally empty — injected in Phase 2
+          shapes: [],        // intentionally empty — injected in Phase 2
           totalPieces: String(editItem.totalPieces || ''),
           totalWeight: String(editItem.totalWeight || ''),
           purchaseCode: editItem.purchaseCode || '',
@@ -175,11 +208,13 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
           },
           certification: editItem.certification || '',
           location: editItem.location || '',
+          mineName: editItem.mineName || '',
           status: editItem.status || 'in_stock',
           description: editItem.description || '',
           images: editItem.images || []
         });
       } else {
+        pendingShapeRef.current = null;
         setFormData({
           category: '',
           cuttingStyle: '',
@@ -198,6 +233,7 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
           },
           certification: '',
           location: '',
+          mineName: '',
           status: 'in_stock',
           description: '',
           images: []
@@ -205,6 +241,26 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
       }
     }
   }, [open, editItem]);
+
+  // Phase 2: After lot type has rendered and ShapeSelector has mounted,
+  // inject the saved shape value so the field shows correctly.
+  useEffect(() => {
+    if (!pendingShapeRef.current) return;
+
+    const pending = pendingShapeRef.current;
+    pendingShapeRef.current = null;
+
+    // Wait one frame so lot type conditional rendering is committed to DOM
+    const rafId = requestAnimationFrame(() => {
+      setFormData(prev => ({
+        ...prev,
+        singleShape: prev.shapeType === 'single' ? pending.singleShape : '',
+        shapes: prev.shapeType === 'mix' ? pending.shapes : [],
+      }));
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [formData.shapeType, open]);
 
   const handleShapeTypeChange = (value: 'single' | 'mix') => {
     setFormData(prev => ({
@@ -377,6 +433,7 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
 
         certification: formData.certification,
         location: formData.location,
+        mineName: formData.mineName,
         status: formData.status,
         description: formData.description,
         images: formData.images,
@@ -803,6 +860,67 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
                 placeholder="e.g., New York, Mumbai"
               />
             </div>
+          </div>
+
+          {/* Mine / Source */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <Label htmlFor="mineName">Mine / Source</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 text-xs"
+                onClick={() => setShowNewMine(!showNewMine)}
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                New Mine
+              </Button>
+            </div>
+            {showNewMine && (
+              <div className="flex gap-2 mb-2">
+                <Input
+                  value={newMineName}
+                  onChange={(e) => setNewMineName(e.target.value)}
+                  placeholder="Mine name"
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    const name = newMineName.trim();
+                    if (!name) return;
+                    if (!mineNames.includes(name)) {
+                      setMineNames(prev => [...prev, name].sort());
+                    }
+                    setFormData(prev => ({ ...prev, mineName: name }));
+                    setNewMineName('');
+                    setShowNewMine(false);
+                  }}
+                >
+                  Add
+                </Button>
+                <Button type="button" variant="ghost" size="sm" onClick={() => { setShowNewMine(false); setNewMineName(''); }}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+            <select
+              id="mineName"
+              className="w-full px-3 py-2 border border-input rounded-md bg-background"
+              value={formData.mineName}
+              onChange={(e) => setFormData(prev => ({ ...prev, mineName: e.target.value }))}
+              aria-label="Mine name"
+            >
+              <option value="">No mine selected</option>
+              {mineNames.map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+              {formData.mineName && !mineNames.includes(formData.mineName) && (
+                <option value={formData.mineName}>{formData.mineName}</option>
+              )}
+            </select>
           </div>
 
           {/* Status */}

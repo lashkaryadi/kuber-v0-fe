@@ -5,11 +5,18 @@ import {
   Download,
   Upload,
   RotateCcw,
+  FileDown,
+  LayoutGrid,
+  List,
+  QrCode,
+  ScanLine,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InventoryTable } from "@/components/inventory/InventoryTable";
+import { InventoryCardView } from "@/components/inventory/InventoryCardView";
 import { AddInventoryDialog } from "@/components/inventory/AddInventoryDialog";
+import { QRScannerDialog } from "@/components/inventory/QRScannerDialog";
 import { InventoryItem, CUTTING_STYLES, CuttingStyleCode } from "@/types/inventory";
 import { toast } from "sonner";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -43,10 +50,13 @@ export const Inventory = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const csvInputRef = useRef<HTMLInputElement>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   // Fetch categories, shapes, series on mount
   useEffect(() => {
@@ -115,6 +125,7 @@ export const Inventory = () => {
       const response = await api.getInventory(params);
       setInventory(response.data);
       setTotalPages(response.meta?.totalPages || 1);
+      setTotalItems(response.meta?.total || response.data?.length || 0);
     } catch (error) {
       console.error("Error fetching inventory:", error);
       toast.error("Failed to fetch inventory");
@@ -178,10 +189,33 @@ export const Inventory = () => {
     shapeFilter !== "ALL" || cuttingStyleFilter !== "ALL" || seriesFilter !== "ALL" ||
     lotTypeFilter !== "ALL" || minWeight || maxWeight || minPieces || maxPieces;
 
+  // Build current filter params (shared between fetch and export)
+  const getFilterParams = (): Record<string, any> => {
+    const params: Record<string, any> = {};
+    if (searchTerm) params.search = searchTerm;
+    if (categoryFilter !== "ALL") params.category = categoryFilter;
+    if (statusFilter !== "All Status") params.status = statusFilter;
+    if (shapeFilter !== "ALL") params.shape = shapeFilter;
+    if (cuttingStyleFilter !== "ALL") params.cuttingStyle = cuttingStyleFilter;
+    if (seriesFilter !== "ALL") params.series = seriesFilter;
+    if (lotTypeFilter !== "ALL") params.lotType = lotTypeFilter;
+    if (minWeight) params.minWeight = minWeight;
+    if (maxWeight) params.maxWeight = maxWeight;
+    if (minPieces) params.minPieces = minPieces;
+    if (maxPieces) params.maxPieces = maxPieces;
+    params.sortBy = sortBy;
+    params.sortOrder = sortOrder;
+    return params;
+  };
+
   const handleExport = async () => {
     try {
-      await api.exportInventoryExcel();
-      toast.success("Inventory exported successfully");
+      await api.exportInventoryExcel(getFilterParams());
+      toast.success(
+        hasActiveFilters
+          ? `Exported ${totalItems} filtered items`
+          : "All inventory exported"
+      );
     } catch (error) {
       console.error("Error exporting:", error);
       toast.error("Failed to export inventory");
@@ -226,7 +260,7 @@ export const Inventory = () => {
               className="border-input hover:bg-accent hover:text-accent-foreground"
             >
               <Download className="w-4 h-4 mr-2" />
-              Export Excel
+              Export Excel{hasActiveFilters ? ` (${totalItems} items)` : ''}
             </Button>
             <Button
               variant="secondary"
@@ -235,6 +269,48 @@ export const Inventory = () => {
             >
               <Upload className="w-4 h-4 mr-2" />
               Import CSV
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={async () => {
+                try {
+                  await api.downloadCSVTemplate();
+                  toast.success("Template downloaded");
+                } catch {
+                  toast.error("Failed to download template");
+                }
+              }}
+              title="Download CSV template with correct headers"
+            >
+              <FileDown className="w-4 h-4 mr-1" />
+              Template
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  const params = getFilterParams();
+                  await api.downloadQRLabelsPDF(params);
+                  toast.success("QR labels PDF downloaded");
+                } catch {
+                  toast.error("Failed to download QR labels");
+                }
+              }}
+              title="Download QR code labels PDF for current items"
+            >
+              <QrCode className="w-4 h-4 mr-1" />
+              QR Labels
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsScannerOpen(true)}
+              title="Scan QR code to find an item"
+            >
+              <ScanLine className="w-4 h-4 mr-1" />
+              Scan
             </Button>
             <input
               ref={csvInputRef}
@@ -271,6 +347,26 @@ export const Inventory = () => {
           >
             {showFilters ? 'Hide Filters' : 'Show Filters'}
           </Button>
+          <div className="flex border rounded-md overflow-hidden">
+            <Button
+              variant={viewMode === 'table' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('table')}
+              className="rounded-none"
+              title="Table view"
+            >
+              <List className="w-4 h-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'card' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('card')}
+              className="rounded-none"
+              title="Card view"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </Button>
+          </div>
           {hasActiveFilters && (
             <Button
               variant="ghost"
@@ -450,8 +546,8 @@ export const Inventory = () => {
           </div>
         )}
 
-        {/* Table */}
-        {inventory.length > 0 && (
+        {/* Table / Card View */}
+        {inventory.length > 0 && viewMode === 'table' && (
           <InventoryTable
             inventory={inventory}
             loading={loading}
@@ -464,6 +560,19 @@ export const Inventory = () => {
             sortBy={sortBy}
             sortOrder={sortOrder}
             onSort={handleSort}
+          />
+        )}
+
+        {inventory.length > 0 && viewMode === 'card' && (
+          <InventoryCardView
+            inventory={inventory}
+            loading={loading}
+            onRefresh={() => {
+              fetchInventory();
+              fetchAvailableShapes();
+              fetchSeries();
+            }}
+            categories={categories}
           />
         )}
 
@@ -487,6 +596,11 @@ export const Inventory = () => {
             fetchSeries();
           }}
           categories={categories}
+        />
+
+        <QRScannerDialog
+          open={isScannerOpen}
+          onOpenChange={setIsScannerOpen}
         />
       </div>
     </MainLayout>

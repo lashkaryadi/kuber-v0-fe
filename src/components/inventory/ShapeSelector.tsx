@@ -31,6 +31,7 @@ export const ShapeSelector: React.FC<ShapeSelectorProps> = ({
   const [availableShapes, setAvailableShapes] = useState<
     { _id: string; name: string }[]
   >([]);
+  const [shapesLoaded, setShapesLoaded] = useState(false);
   const [isCreatingNewShape, setIsCreatingNewShape] = useState(false);
   const [newShapeName, setNewShapeName] = useState("");
 
@@ -48,7 +49,30 @@ export const ShapeSelector: React.FC<ShapeSelectorProps> = ({
       console.error("Error fetching shapes:", error);
       toast.error("Failed to load shapes");
       setAvailableShapes([]); // Set empty array on error
+    } finally {
+      setShapesLoaded(true);
     }
+  };
+
+  // Build the display list: ensure current shape values are always included
+  // so Radix Select can match the value even if the API hasn't returned yet
+  const getDisplayShapes = () => {
+    const currentShapeNames = shapes
+      .map(s => s.shape)
+      .filter(Boolean);
+
+    if (availableShapes.length === 0 && !shapesLoaded) {
+      // Shapes haven't loaded yet — show current values as temporary options
+      return currentShapeNames.map(name => ({ _id: `temp-${name}`, name }));
+    }
+
+    // Shapes loaded — ensure any current values not in the list are added
+    const existing = new Set(availableShapes.map(s => s.name));
+    const extras = currentShapeNames
+      .filter(name => !existing.has(name))
+      .map(name => ({ _id: `temp-${name}`, name }));
+
+    return [...availableShapes, ...extras];
   };
 
   const handleCreateShape = async () => {
@@ -119,13 +143,15 @@ export const ShapeSelector: React.FC<ShapeSelectorProps> = ({
   /* ================= SINGLE SHAPE ================= */
 
   if (isSingleShape) {
+    const displayShapes = getDisplayShapes();
+
     return (
       <div className="space-y-2">
         <Select
           value={shapes[0]?.shape || ""}
           onValueChange={(value) => {
             if (value === "create_new") {
-              setIsCreatingNewShape(true); // 🔥 THIS IS THE KEY FIX
+              setIsCreatingNewShape(true);
             } else {
               onChange([{ shape: value, pieces: 0, weight: 0 }]);
             }
@@ -135,14 +161,12 @@ export const ShapeSelector: React.FC<ShapeSelectorProps> = ({
             <SelectValue placeholder="Select shape..." />
           </SelectTrigger>
           <SelectContent>
-            {availableShapes && availableShapes.length > 0 ? (
-              availableShapes
-                .filter((shape) => shape && shape._id && shape.name)
-                .map((shape) => (
-                  <SelectItem key={shape._id} value={shape.name}>
-                    {shape.name}
-                  </SelectItem>
-                ))
+            {displayShapes.length > 0 ? (
+              displayShapes.map((shape) => (
+                <SelectItem key={shape._id} value={shape.name}>
+                  {shape.name}
+                </SelectItem>
+              ))
             ) : (
               <div className="px-2 py-1 text-sm text-muted-foreground">
                 No shapes available
@@ -171,6 +195,8 @@ export const ShapeSelector: React.FC<ShapeSelectorProps> = ({
   }
 
   /* ================= MIX SHAPES ================= */
+
+  const displayShapes = getDisplayShapes();
 
   return (
     <div className="space-y-3">
@@ -201,14 +227,12 @@ export const ShapeSelector: React.FC<ShapeSelectorProps> = ({
               <SelectValue placeholder="Shape" />
             </SelectTrigger>
             <SelectContent>
-              {availableShapes && availableShapes.length > 0 ? (
-                availableShapes
-                  .filter((shape) => shape && shape._id && shape.name)
-                  .map((shape) => (
-                    <SelectItem key={shape._id} value={shape.name}>
-                      {shape.name}
-                    </SelectItem>
-                  ))
+              {displayShapes.length > 0 ? (
+                displayShapes.map((shape) => (
+                  <SelectItem key={shape._id} value={shape.name}>
+                    {shape.name}
+                  </SelectItem>
+                ))
               ) : (
                 <div className="px-2 py-1 text-sm text-muted-foreground">
                   No shapes available

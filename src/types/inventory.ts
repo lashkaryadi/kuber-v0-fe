@@ -70,6 +70,9 @@ export interface InventoryItem {
   certification?: string;
   location?: string;
 
+  mine?: boolean;  // @deprecated — kept for backward compat with old data
+  mineName?: string;
+
   status: 'in_stock' | 'pending' | 'partially_sold' | 'sold';
 
   description?: string;
