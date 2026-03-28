@@ -289,7 +289,9 @@ const getInventory = async (params?: any) => {
 const getInventoryById = async (id: string) => {
   try {
     const response = await apiClient.get(`/api/inventory/${id}`);
-    return { success: true, data: response.data };
+    // Handle both wrapped and unwrapped responses
+    const itemData = response.data?.data || response.data;
+    return { success: true, data: itemData };
   } catch (error) {
     console.error("Error fetching inventory item:", error);
     return { success: false, data: null };

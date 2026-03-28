@@ -154,10 +154,13 @@ export const QRScannerDialog: React.FC<QRScannerDialogProps> = ({
       const response = await api.getInventoryById(itemId);
       console.log('API response:', response);
       
-      if (response.success && response.data) {
-        setFoundItem(response.data);
+      // Handle nested response structure
+      const itemData = response.data?.data || response.data;
+      
+      if (response.success && itemData) {
+        setFoundItem(itemData);
         setDetailOpen(true);
-        toast.success(`Found: ${response.data.serialNumber}`);
+        toast.success(`Found: ${itemData.serialNumber}`);
       } else {
         console.error('No data in response:', response);
         toast.error(response.message || 'Item not found');
