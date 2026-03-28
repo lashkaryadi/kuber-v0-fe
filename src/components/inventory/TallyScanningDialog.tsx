@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Check, X, AlertCircle } from 'lucide-react';
+import { Check, X, AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/services/api';
 
@@ -41,11 +41,14 @@ export const TallyScanningDialog: React.FC<TallyScanningDialogProps> = ({
   seriesName,
 }) => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const isCleaningUp = useRef(false);
   const [scanning, setScanning] = useState(false);
   const [seriesData, setSeriesData] = useState<any>(null);
   const [scannedItems, setScannedItems] = useState<ScannedItem[]>([]);
   const [tallyResult, setTallyResult] = useState<TallyResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
   const scannedIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -73,40 +76,97 @@ export const TallyScanningDialog: React.FC<TallyScanningDialogProps> = ({
     }
   };
 
-  const startScanner = async () => {
-    try {
-      const scanner = new Html5Qrcode('tally-qr-reader');
-      scannerRef.current = scanner;
-
-      await scanner.start(
-        { facingMode: 'environment' },
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-        },
-        handleScanSuccess,
-        () => {} // ignore scan failures
-      );
-      setScanning(true);
-    } catch (error) {
-      console.error('Failed to start scanner:', error);
-      toast.error('Could not access camera. Please check permissions.');
-    }
-  };
-
   const stopScanner = async () => {
+    if (isCleaningUp.current) return;
+    isCleaningUp.current = true;
+
     if (scannerRef.current) {
       try {
         if (scannerRef.current.isScanning) {
           await scannerRef.current.stop();
         }
+      } catch (e) {
+        console.log('Stop error:', e);
+      }
+      try {
         scannerRef.current.clear();
       } catch (e) {
-        // ignore cleanup errors
+        console.log('Clear error:', e);
       }
       scannerRef.current = null;
     }
     setScanning(false);
+    isCleaningUp.current = false;
+  };
+
+  const startScanner = async () => {
+    if (isCleaningUp.current) {
+      setTimeout(() => startScanner(), 100);
+      return;
+    }
+
+    setIsStarting(true);
+    setError(null);
+
+    try {
+      // Wait for DOM to be ready
+      const element = document.getElementById('tally-qr-reader');
+      if (!element) {
+        setTimeout(() => startScanner(), 300);
+        return;
+      }
+
+      // Check camera availability
+      try {
+        const cameras = await Html5Qrcode.getCameras();
+        if (!cameras || cameras.length === 0) {
+          setError('No camera found on this device.');
+          setIsStarting(false);
+          return;
+        }
+      } catch (cameraCheckError) {
+        console.error('Camera check error:', cameraCheckError);
+      }
+
+      // Initialize scanner
+      if (!scannerRef.current) {
+        scannerRef.current = new Html5Qrcode('tally-qr-reader');
+      }
+
+      await scannerRef.current.start(
+        { facingMode: 'environment' }, // rear camera
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+        },
+        handleScanSuccess,
+        (errorMessage: string) => {
+          // Ignore "QR code not found" errors - these are expected
+          if (!errorMessage?.includes('NotFoundException')) {
+            console.debug('Scan error:', errorMessage);
+          }
+        }
+      );
+      setScanning(true);
+    } catch (err: any) {
+      console.error('Scanner initialization error:', err);
+      let errorMessage = 'Could not access camera. Please check permissions.';
+
+      if (err.name === 'NotAllowedError' || err.message?.includes('Permission denied')) {
+        errorMessage = 'Camera permission denied. Please allow camera access in your browser settings.';
+      } else if (err.name === 'NotFoundError') {
+        errorMessage = 'No camera found on this device.';
+      } else if (err.message?.includes('already in use')) {
+        errorMessage = 'Camera is already in use by another app.';
+      } else if (err.message) {
+        errorMessage = `Camera error: ${err.message}`;
+      }
+
+      setError(errorMessage);
+    } finally {
+      setIsStarting(false);
+    }
   };
 
   const handleScanSuccess = (decodedText: string) => {
@@ -152,6 +212,7 @@ export const TallyScanningDialog: React.FC<TallyScanningDialogProps> = ({
     setScannedItems([]);
     scannedIdsRef.current.clear();
     setTallyResult(null);
+    setError(null);
     startScanner();
   };
 
@@ -161,6 +222,7 @@ export const TallyScanningDialog: React.FC<TallyScanningDialogProps> = ({
     scannedIdsRef.current.clear();
     setTallyResult(null);
     setSeriesData(null);
+    setError(null);
     onOpenChange(false);
   };
 
@@ -245,17 +307,38 @@ export const TallyScanningDialog: React.FC<TallyScanningDialogProps> = ({
               </div>
             ) : (
               // Scanner view
-              <>
+              <div className="space-y-3">
                 <div
                   id="tally-qr-reader"
-                  className="w-full rounded-md overflow-hidden bg-black min-h-[300px]"
+                  className="w-full rounded-md overflow-hidden bg-black min-h-[300px] border border-border"
                 />
-                {scanning && (
+
+                {/* Status Messages */}
+                {isStarting && (
+                  <div className="flex items-center justify-center gap-2 p-3 bg-blue-50 dark:bg-blue-950 rounded-md border border-blue-200 dark:border-blue-800">
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
+                    <p className="text-sm text-blue-700 dark:text-blue-300">Starting camera...</p>
+                  </div>
+                )}
+
+                {scanning && !error && (
                   <p className="text-sm text-center text-muted-foreground">
                     Scanning... Hold steady to scan items
                   </p>
                 )}
-              </>
+
+                {error && (
+                  <div className="flex gap-3 p-3 bg-red-50 dark:bg-red-950 rounded-md border border-red-200 dark:border-red-800">
+                    <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-medium text-red-700 dark:text-red-300">{error}</p>
+                      <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                        💡 On Chrome: Click the 🔒 in address bar → Camera → Allow
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -325,6 +408,15 @@ export const TallyScanningDialog: React.FC<TallyScanningDialogProps> = ({
         </div>
 
         <div className="flex justify-end gap-2 border-t pt-4">
+          {error && !tallyResult && (
+            <Button
+              variant="outline"
+              onClick={startScanner}
+              disabled={isStarting}
+            >
+              Try Again
+            </Button>
+          )}
           <Button variant="outline" onClick={handleClose}>
             {tallyResult ? 'Close' : 'Cancel'}
           </Button>
