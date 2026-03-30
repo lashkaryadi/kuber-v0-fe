@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { InventoryItem, CUTTING_STYLES, CuttingStyleCode } from '@/types/inventory';
+import { BASE_URL } from '@/services/api';
 
 interface InventoryDetailModalProps {
   open: boolean;
@@ -20,6 +21,17 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({
   onOpenChange,
   item,
 }) => {
+  const getImageUrl = (imagePath: string): string => {
+    if (!imagePath) return '';
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return imagePath;
+    }
+    if (imagePath.startsWith('/')) {
+      return `${BASE_URL}${imagePath}`;
+    }
+    return `${BASE_URL}/uploads/${imagePath}`;
+  };
+
   const getStatusBadge = () => {
     const isSold = item.availablePieces === 0 && item.availableWeight === 0;
     const isPartial = item.availablePieces < item.totalPieces || item.availableWeight < item.totalWeight;
@@ -106,7 +118,7 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({
                 {item.images.map((img, i) => (
                   <img
                     key={i}
-                    src={img}
+                    src={getImageUrl(img)}
                     alt={`${item.serialNumber}-${i}`}
                     className="w-24 h-24 object-cover rounded-md border"
                   />

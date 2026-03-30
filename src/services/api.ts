@@ -1386,6 +1386,6 @@ const api = {
 };
 
 // Named exports for backward compatibility
-export { getCompany, saveCompany, uploadCompanyImage };
+export { getCompany, saveCompany, uploadCompanyImage, BASE_URL };
 
 export default api;

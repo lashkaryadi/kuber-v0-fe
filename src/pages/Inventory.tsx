@@ -24,6 +24,12 @@ import { toast } from "sonner";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Pagination } from "@/components/common/Pagination";
 import api from "@/services/api";
+import { FilterCategorySelector } from "@/components/inventory/FilterCategorySelector";
+import { FilterCuttingStyleSelector } from "@/components/inventory/FilterCuttingStyleSelector";
+import { FilterSeriesSelector } from "@/components/inventory/FilterSeriesSelector";
+import { FilterStatusSelector } from "@/components/inventory/FilterStatusSelector";
+import { ShapeFilterSelector } from "@/components/inventory/ShapeFilterSelector";
+import { LotTypeSelector } from "@/components/inventory/LotTypeSelector";
 
 type ShapeName = string;
 
@@ -437,97 +443,64 @@ export const Inventory = () => {
               {/* Category Filter */}
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Category</label>
-                <select
+                <FilterCategorySelector
+                  categories={categories}
                   value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm"
-                  aria-label="Filter by category"
-                >
-                  <option value="ALL">All Categories</option>
-                  {categories.map((cat) => (
-                    <option key={cat._id} value={cat._id}>{cat.name}</option>
-                  ))}
-                </select>
+                  onChange={setCategoryFilter}
+                  placeholder="All Categories"
+                />
               </div>
 
               {/* Shape Filter */}
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Shape</label>
-                <select
+                <ShapeFilterSelector
+                  shapes={availableShapes}
                   value={shapeFilter}
-                  onChange={(e) => setShapeFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm"
-                  aria-label="Filter by shape"
-                >
-                  <option value="ALL">All Shapes</option>
-                  {availableShapes.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
+                  onChange={setShapeFilter}
+                  placeholder="All Shapes"
+                />
               </div>
 
               {/* Cutting Style Filter */}
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Cutting Style</label>
-                <select
+                <FilterCuttingStyleSelector
                   value={cuttingStyleFilter}
-                  onChange={(e) => setCuttingStyleFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm"
-                  aria-label="Filter by cutting style"
-                >
-                  <option value="ALL">All Styles</option>
-                  {Object.entries(CUTTING_STYLES).map(([code, name]) => (
-                    <option key={code} value={code}>{code} - {name}</option>
-                  ))}
-                </select>
+                  onChange={setCuttingStyleFilter}
+                  placeholder="All Styles"
+                />
               </div>
 
               {/* Series Filter */}
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Series</label>
-                <select
+                <FilterSeriesSelector
+                  series={seriesList}
                   value={seriesFilter}
-                  onChange={(e) => setSeriesFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm"
-                  aria-label="Filter by series"
-                >
-                  <option value="ALL">All Series</option>
-                  {seriesList.map((s) => (
-                    <option key={s._id} value={s._id}>{s.name}</option>
-                  ))}
-                </select>
+                  onChange={setSeriesFilter}
+                  placeholder="All Series"
+                />
               </div>
 
               {/* Lot Type Filter */}
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Lot Type</label>
-                <select
+                <LotTypeSelector
                   value={lotTypeFilter}
-                  onChange={(e) => setLotTypeFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm"
-                  aria-label="Filter by lot type"
-                >
-                  <option value="ALL">All Types</option>
-                  <option value="single">Single</option>
-                  <option value="mix">Mix</option>
-                </select>
+                  onChange={setLotTypeFilter}
+                  placeholder="All Types"
+                />
               </div>
 
               {/* Status Filter */}
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Status</label>
-                <select
+                <FilterStatusSelector
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm"
-                  aria-label="Filter by status"
-                >
-                  <option value="All Status">All Status</option>
-                  <option value="In Stock">In Stock</option>
-                  <option value="Pending">Pending</option>
-                  <option value="Partially Sold">Partially Sold</option>
-                  <option value="Sold">Sold</option>
-                </select>
+                  onChange={setStatusFilter}
+                  placeholder="All Status"
+                />
               </div>
             </div>
 

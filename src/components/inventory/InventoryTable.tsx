@@ -232,10 +232,8 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-sm">
                   Dimensions
                 </th>
-                <SortableHeader field="saleCode">Price/Ct</SortableHeader>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-sm">
-                  Total Value
-                </th>
+                <SortableHeader field="purchaseCode">Purchase Price</SortableHeader>
+                <SortableHeader field="saleCode">Sale Price</SortableHeader>
                 <SortableHeader field="status">Status</SortableHeader>
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-sm">
                   Actions
@@ -281,10 +279,10 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                     {formatDimensions(item)}
                   </td>
                   <td className="p-4 align-middle">
-                    {getPriceDisplay(item)}
+                    {item.purchaseCode ? item.purchaseCode : '-'}
                   </td>
-                  <td className="p-4 align-middle font-medium">
-                    {getTotalPriceDisplay(item)}
+                  <td className="p-4 align-middle">
+                    {item.saleCode ? item.saleCode : '-'}
                   </td>
                   <td className="p-4 align-middle">
                     {getStatusBadge(item)}

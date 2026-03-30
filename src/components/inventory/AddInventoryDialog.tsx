@@ -7,6 +7,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ShapeSelector } from './ShapeSelector';
 import { CategorySelector } from './CategorySelector';
+import { CuttingStyleSelector } from './CuttingStyleSelector';
+import { SeriesSelector } from './SeriesSelector';
+import { StatusSelector } from './StatusSelector';
+import { MineNameSelector } from './MineNameSelector';
 import { ImageUpload } from '@/components/common/ImageUpload';
 import { InventoryItem, InventoryShape, CUTTING_STYLES, CuttingStyleCode } from '@/types/inventory';
 import { toast } from 'sonner';
@@ -509,18 +513,11 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
           {/* Cutting Style Selection */}
           <div>
             <Label htmlFor="cuttingStyle">Cutting Style</Label>
-            <select
-              id="cuttingStyle"
-              className="w-full px-3 py-2 border border-input rounded-md bg-background"
+            <CuttingStyleSelector
               value={formData.cuttingStyle}
-              onChange={(e) => setFormData(prev => ({ ...prev, cuttingStyle: e.target.value as CuttingStyleCode | '' }))}
-              aria-label="Cutting style"
-            >
-              <option value="">Select cutting style...</option>
-              {Object.entries(CUTTING_STYLES).map(([code, name]) => (
-                <option key={code} value={code}>{code} - {name}</option>
-              ))}
-            </select>
+              onChange={(value) => setFormData(prev => ({ ...prev, cuttingStyle: value }))}
+              placeholder="Select cutting style..."
+            />
           </div>
 
           {/* Series Selection */}
@@ -554,18 +551,12 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
                 </Button>
               </div>
             )}
-            <select
-              id="series"
-              className="w-full px-3 py-2 border border-input rounded-md bg-background"
+            <SeriesSelector
+              series={seriesList}
               value={formData.series}
-              onChange={(e) => setFormData(prev => ({ ...prev, series: e.target.value }))}
-              aria-label="Series"
-            >
-              <option value="">No series</option>
-              {seriesList.map((s) => (
-                <option key={s._id} value={s._id}>{s.name}</option>
-              ))}
-            </select>
+              onChange={(value) => setFormData(prev => ({ ...prev, series: value }))}
+              placeholder="Select a series..."
+            />
           </div>
 
           {/* Shape Type Selection */}
@@ -906,36 +897,26 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
                 </Button>
               </div>
             )}
-            <select
-              id="mineName"
-              className="w-full px-3 py-2 border border-input rounded-md bg-background"
+            <MineNameSelector
+              mineNames={mineNames}
               value={formData.mineName}
-              onChange={(e) => setFormData(prev => ({ ...prev, mineName: e.target.value }))}
-              aria-label="Mine name"
-            >
-              <option value="">No mine selected</option>
-              {mineNames.map((name) => (
-                <option key={name} value={name}>{name}</option>
-              ))}
-              {formData.mineName && !mineNames.includes(formData.mineName) && (
-                <option value={formData.mineName}>{formData.mineName}</option>
-              )}
-            </select>
+              onChange={(value) => setFormData(prev => ({ ...prev, mineName: value }))}
+              placeholder="No mine selected"
+            />
           </div>
 
           {/* Status */}
           <div>
             <Label htmlFor="status">Status</Label>
-            <select
-              id="status"
-              className="w-full px-3 py-2 border border-input rounded-md bg-background"
+            <StatusSelector
               value={formData.status}
-              onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-              aria-label="Item status"
-            >
-              <option value="in_stock">In Stock</option>
-              <option value="pending">Pending</option>
-            </select>
+              onChange={(value) => setFormData(prev => ({ ...prev, status: value }))}
+              options={[
+                { value: 'in_stock', label: 'In Stock' },
+                { value: 'pending', label: 'Pending' }
+              ]}
+              placeholder="Select status..."
+            />
           </div>
 
           {/* Description */}

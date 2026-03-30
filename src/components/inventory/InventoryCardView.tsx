@@ -8,7 +8,7 @@ import { SellInventoryDialog } from './SellInventoryDialog';
 import { MergePacketDialog } from './MergePacketDialog';
 import { InventoryDetailModal } from './InventoryDetailModal';
 import { toast } from 'sonner';
-import api from '@/services/api';
+import api, { BASE_URL } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface InventoryCardViewProps {
@@ -34,6 +34,7 @@ export const InventoryCardView: React.FC<InventoryCardViewProps> = ({
   const [isSellOpen, setIsSellOpen] = useState(false);
   const [isMergeOpen, setIsMergeOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
   const isAdmin = user?.role === 'admin';
 
@@ -88,6 +89,29 @@ export const InventoryCardView: React.FC<InventoryCardViewProps> = ({
 
   const canSell = (item: InventoryItem) => item.availablePieces > 0 || item.availableWeight > 0;
 
+  const handleImageError = (itemId: string, imageUrl: string) => {
+    console.warn(`Image failed to load for item ${itemId}:`, imageUrl);
+    setFailedImages(prev => new Set([...prev, itemId]));
+  };
+
+  const handleImageLoad = (itemId: string, imageUrl: string) => {
+    console.log(`Image loaded successfully for item ${itemId}:`, imageUrl);
+  };
+
+  const getImageUrl = (imagePath: string): string => {
+    if (!imagePath) return '';
+    // If it's already an absolute URL, return as-is
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return imagePath;
+    }
+    // If it's a relative path, prepend BASE_URL
+    if (imagePath.startsWith('/')) {
+      return `${BASE_URL}${imagePath}`;
+    }
+    // Otherwise, treat as relative to uploads
+    return `${BASE_URL}/uploads/${imagePath}`;
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -115,17 +139,19 @@ export const InventoryCardView: React.FC<InventoryCardViewProps> = ({
             className="border rounded-lg bg-card overflow-hidden hover:shadow-md transition-shadow"
           >
             {/* Thumbnail */}
-            {item.images && item.images.length > 0 ? (
+            {item.images && item.images.length > 0 && !failedImages.has(item._id) ? (
               <div className="h-36 bg-muted overflow-hidden">
                 <img
-                  src={item.images[0]}
+                  src={getImageUrl(item.images[0])}
                   alt={item.serialNumber}
                   className="w-full h-full object-cover"
+                  onLoad={() => handleImageLoad(item._id, item.images[0])}
+                  onError={() => handleImageError(item._id, item.images[0])}
                 />
               </div>
             ) : (
-              <div className="h-20 bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center">
-                <span className="text-2xl font-bold text-muted-foreground/30">
+              <div className="h-36 bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center">
+                <span className="text-5xl font-bold text-muted-foreground/30">
                   {item.category?.name?.charAt(0) || 'G'}
                 </span>
               </div>
@@ -170,6 +196,18 @@ export const InventoryCardView: React.FC<InventoryCardViewProps> = ({
                   </span>
                   <span className="text-muted-foreground">/{item.totalPieces}</span>
                 </span>
+              </div>
+
+              {/* Purchase & Sale Price */}
+              <div className="text-xs space-y-1 py-1 border-y">
+                <div>
+                  <span className="text-muted-foreground">Buy: </span>
+                  <span className="font-medium">{item.purchaseCode ? item.purchaseCode : '-'}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Sell: </span>
+                  <span className="font-medium">{item.saleCode ? item.saleCode : '-'}</span>
+                </div>
               </div>
 
               {/* Actions */}
