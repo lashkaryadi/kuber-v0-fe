@@ -558,11 +558,16 @@ const mergePackets = async (sourceId: string, targetId: string) => {
 const uploadImage = async (file: File) => {
   try {
     const formData = new FormData();
-    formData.append("image", file);
-    const response = await apiClient.post("/api/upload", formData, {
+    formData.append("file", file);
+    const response = await apiClient.post("/api/inventory-upload/image", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
-    return { data: { url: response.data?.url || response.data } };
+    return { 
+      data: { 
+        url: response.data?.url || response.data,
+        publicId: response.data?.publicId
+      } 
+    };
   } catch (error) {
     console.error("Error uploading image:", error);
     return { data: null, error: (error as Error).message };
