@@ -43,4 +43,8 @@ export default defineConfig({
       },
     },
   },
+  // Optimize for Cloudinary image loading
+  define: {
+    'process.env.VITE_CLOUDINARY_CLOUD_NAME': JSON.stringify(process.env.VITE_CLOUDINARY_CLOUD_NAME || 'dk6qryoad'),
+  },
 })
