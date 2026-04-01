@@ -1206,7 +1206,7 @@ const getAuditLogs = async (params?: any) => {
 
 const clearAuditLogs = async () => {
   try {
-    const response = await apiClient.delete("/api/audit-logs");
+    const response = await apiClient.delete("/api/audit-logs/clear");
     const message = response?.data?.message || "Audit logs cleared successfully";
     return { success: true, message };
   } catch (error: any) {
