@@ -14,6 +14,13 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { InventoryTable } from "@/components/inventory/InventoryTable";
 import { InventoryCardView } from "@/components/inventory/InventoryCardView";
 import { AddInventoryDialog } from "@/components/inventory/AddInventoryDialog";
@@ -57,6 +64,7 @@ export const Inventory = () => {
   const [seriesList, setSeriesList] = useState<SeriesItem[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [sortBy, setSortBy] = useState("createdAt");
@@ -117,7 +125,7 @@ export const Inventory = () => {
     try {
       const params: Record<string, any> = {
         page,
-        limit: 10,
+        limit,
         sortBy,
         sortOrder,
         ...(searchTerm && { search: searchTerm }),
@@ -144,7 +152,7 @@ export const Inventory = () => {
       setLoading(false);
     }
   }, [
-    page, searchTerm, categoryFilter, statusFilter, shapeFilter,
+    page, limit, searchTerm, categoryFilter, statusFilter, shapeFilter,
     cuttingStyleFilter, seriesFilter, lotTypeFilter,
     minWeight, maxWeight, minPieces, maxPieces,
     sortBy, sortOrder
@@ -599,13 +607,38 @@ export const Inventory = () => {
         )}
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            onChange={(p) => setPage(p)}
-          />
-        )}
+        <div className="flex items-center justify-between px-4 py-3 border-t rounded-b-lg bg-card">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              Items per page:
+            </span>
+            <Select
+              value={String(limit)}
+              onValueChange={(value) => {
+                setLimit(Number(value));
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {totalPages > 1 && (
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              onChange={(p) => setPage(p)}
+            />
+          )}
+        </div>
 
         {/* Add Inventory Dialog */}
         <AddInventoryDialog

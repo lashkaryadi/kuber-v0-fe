@@ -7,6 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useSearch } from '@/contexts/SearchContext';
 import { Pagination } from '@/components/common/Pagination';
 import api, { Category } from '@/services/api';
@@ -324,18 +331,23 @@ export default function Categories() {
           <div className="flex items-center justify-between px-4 py-3 border-t">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Items per page:</span>
-              <select
-                value={limit}
-                onChange={(e) => {
-                  setLimit(Number(e.target.value));
+              <Select
+                value={String(limit)}
+                onValueChange={(value) => {
+                  setLimit(Number(value));
                   setPage(1);
                 }}
-                className="border rounded px-2 py-1"
               >
-                {[10, 25, 50, 100].map(n => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
+                <SelectTrigger className="w-20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <Pagination page={meta?.page} totalPages={meta?.pages} onChange={setPage} />

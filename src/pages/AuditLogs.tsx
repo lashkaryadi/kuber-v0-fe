@@ -3,6 +3,13 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { DataTable, Column } from "@/components/common/DataTable";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Pagination } from "@/components/common/Pagination";
 import api from "@/services/api";
 import { toast } from "@/hooks/use-toast";
@@ -165,19 +172,23 @@ export default function AuditLogs() {
           <div className="flex items-center justify-between px-4 py-3 border-t">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Items per page:</span>
-              <select
-                aria-label="Items per page"
-                value={limit}
-                onChange={(e) => {
-                  setLimit(Number(e.target.value));
+              <Select
+                value={String(limit)}
+                onValueChange={(value) => {
+                  setLimit(Number(value));
                   setPage(1);
                 }}
-                className="border rounded px-2 py-1"
               >
-                {[10, 25, 50, 100].map(n => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
+                <SelectTrigger className="w-20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <Pagination page={meta?.page || 1} totalPages={meta?.pages || 1} onChange={setPage} />
