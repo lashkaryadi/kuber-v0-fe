@@ -177,10 +177,10 @@ export default function InvoicePreview() {
   }
 
   const formatINR = (amount: number) =>
-    `\u20B9 ${amount.toLocaleString("en-IN", {
+    `$ ${amount.toLocaleString("en-US", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    })}`;
+    })}`;  // Standardized to USD format
 
   const companyAddress = [
     company?.address,
@@ -287,7 +287,7 @@ export default function InvoicePreview() {
                   <p className="text-xs text-gray-500">
                     Date:{" "}
                     <span className="text-gray-700 font-medium">
-                      {new Date(invoice.issueDate).toLocaleDateString("en-IN", {
+                      {new Date(invoice.issueDate).toLocaleDateString("en-US", {
                         year: "numeric",
                         month: "long",
                         day: "numeric",
@@ -466,7 +466,7 @@ export default function InvoicePreview() {
               <p className="text-xs">
                 <span className="font-semibold text-amber-800">Amount in Words: </span>
                 <span className="text-gray-700">
-                  {numberToWords(Math.floor(invoice.total))} Rupees Only
+                  {numberToWords(Math.floor(invoice.total))} Dollars Only
                 </span>
               </p>
             </div>

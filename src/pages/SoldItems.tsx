@@ -281,7 +281,7 @@ export default function SoldItems() {
       ),
       render: (item) => (
         <span className="font-semibold">
-          {"\u20B9"} {(item.totalAmount || item.price || 0).toLocaleString()}
+          $ {(item.totalAmount || item.price || 0).toLocaleString()}
         </span>
       ),
     },
@@ -305,7 +305,7 @@ export default function SoldItems() {
       key: "soldDate",
       header: "Date",
       render: (item) =>
-        new Date(item.soldAt || item.soldDate).toLocaleDateString("en-IN"),
+        new Date(item.soldAt || item.soldDate).toLocaleDateString("en-US"),
     },
     {
       key: "actions",

@@ -161,7 +161,7 @@ export default function Analytics() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {"\u20B9"} {(data.totals.revenue || 0).toLocaleString()}
+                $ {(data.totals.revenue || 0).toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 From {data.totals.count || 0} sales
@@ -232,7 +232,7 @@ export default function Analytics() {
                     <YAxis tick={{ fontSize: 12 }} />
                     <Tooltip
                       formatter={(value: number) => [
-                        `\u20B9 ${value.toLocaleString()}`,
+                        `$ ${value.toLocaleString()}`,
                         "Revenue",
                       ]}
                     />
@@ -268,7 +268,7 @@ export default function Analytics() {
                     <YAxis tick={{ fontSize: 12 }} />
                     <Tooltip
                       formatter={(value: number) => [
-                        `\u20B9 ${value.toLocaleString()}`,
+                        `$ ${value.toLocaleString()}`,
                         "Revenue",
                       ]}
                     />
@@ -348,7 +348,7 @@ export default function Analytics() {
                     />
                     <Tooltip
                       formatter={(value: number) => [
-                        `\u20B9 ${value.toLocaleString()}`,
+                        `$ ${value.toLocaleString()}`,
                         "Revenue",
                       ]}
                     />

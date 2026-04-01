@@ -228,7 +228,7 @@ export default function PackagingDetails() {
                     Price per Carat / Unit
                   </label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
                     <input
                       id="pricePerUnit"
                       type="number"
@@ -257,7 +257,7 @@ export default function PackagingDetails() {
                   <Separator className="bg-border/50" />
                   <div className="flex justify-between items-center pt-1">
                     <span className="font-semibold text-foreground">Total Amount</span>
-                    <span className="font-serif text-lg font-bold text-primary">₹ {totalAmount.toFixed(2)}</span>
+                    <span className="font-serif text-lg font-bold text-primary">$ {totalAmount.toFixed(2)}</span>
                   </div>
                 </div>
 

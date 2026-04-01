@@ -114,7 +114,7 @@ export default function Dashboard() {
       header: "Amount",
       render: (item) => (
         <span className="font-semibold">
-          {"\u20B9"} {(item.totalAmount || item.price || 0).toLocaleString()}
+          $ {(item.totalAmount || item.price || 0).toLocaleString()}
         </span>
       ),
     },
@@ -122,7 +122,7 @@ export default function Dashboard() {
       key: "soldDate",
       header: "Date",
       render: (item) =>
-        new Date(item.soldAt || item.soldDate).toLocaleDateString("en-IN"),
+        new Date(item.soldAt || item.soldDate).toLocaleDateString("en-US"),
     },
   ];
 
@@ -237,7 +237,7 @@ export default function Dashboard() {
                   <p className="text-2xl font-bold text-green-600">
                     {stats?.inStockValue === "-"
                       ? "-"
-                      : `\u20B9 ${Number(stats?.inStockValue || 0).toLocaleString()}`}
+                      : `$ ${Number(stats?.inStockValue || 0).toLocaleString()}`}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     Based on sale code x weight
@@ -256,7 +256,7 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-2xl font-bold text-orange-600">
-                    {"\u20B9"} {(stats?.totalSalesAmount || 0).toLocaleString()}
+                    $ {(stats?.totalSalesAmount || 0).toLocaleString()}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     All completed sales

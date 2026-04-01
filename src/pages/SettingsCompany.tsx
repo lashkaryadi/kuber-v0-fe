@@ -9,6 +9,8 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { toast } from "@/hooks/use-toast";
 import { Loader2, Upload, X, Building2, FileText, CreditCard } from "lucide-react";
 
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
+
 export default function SettingsCompany() {
   const [form, setForm] = useState({
     companyName: "",
@@ -66,10 +68,10 @@ export default function SettingsCompany() {
         });
 
         if (data.logoUrl) {
-          setLogoPreview(`http://localhost:5001${data.logoUrl}`);
+          setLogoPreview(`${BASE_URL}${data.logoUrl}`);
         }
         if (data.signatureUrl) {
-          setSignaturePreview(`http://localhost:5001${data.signatureUrl}`);
+          setSignaturePreview(`${BASE_URL}${data.signatureUrl}`);
         }
       }
     } catch (error) {

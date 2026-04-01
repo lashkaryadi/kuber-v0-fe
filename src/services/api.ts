@@ -1207,12 +1207,21 @@ const getAuditLogs = async (params?: any) => {
 const clearAuditLogs = async () => {
   try {
     const response = await apiClient.delete("/api/audit-logs");
-    return { success: true, message: response.data?.message || "Audit logs cleared" };
+    const message = response?.data?.message || "Audit logs cleared successfully";
+    return { success: true, message };
   } catch (error: any) {
-    console.error("Error clearing audit logs:", error);
+    const errorMessage = 
+      error?.response?.data?.message || 
+      error?.message || 
+      "Failed to clear audit logs";
+    console.error("Error clearing audit logs:", { 
+      error, 
+      message: errorMessage,
+      response: error?.response?.data 
+    });
     return { 
       success: false, 
-      message: error?.response?.data?.message || error.message || "Failed to clear audit logs" 
+      message: errorMessage
     };
   }
 };
