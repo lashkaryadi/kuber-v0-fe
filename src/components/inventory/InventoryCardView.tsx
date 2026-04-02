@@ -62,20 +62,31 @@ export const InventoryCardView: React.FC<InventoryCardViewProps> = ({
     }
   };
 
-  const getStatusBadge = (item: InventoryItem) => {
-    const isSold = item.availablePieces === 0 && item.availableWeight === 0;
-    const isPartial = item.availablePieces < item.totalPieces || item.availableWeight < item.totalWeight;
+  const normalizeStatus = (status?: string) => {
+    if (!status) return '';
+    return String(status).trim().toLowerCase().replace(/\s+/g, '_');
+  };
 
-    if (isSold || item.status === 'sold') {
-      return <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-300 text-xs">Sold</Badge>;
+  const getStatusBadge = (item: InventoryItem) => {
+    const normalizedStatus = normalizeStatus(item.status);
+
+    if (normalizedStatus === 'in_stock') {
+      return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 text-xs">In Stock</Badge>;
     }
-    if (item.status === 'pending') {
+
+    if (normalizedStatus === 'pending') {
       return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300 text-xs">Pending</Badge>;
     }
-    if (isPartial || item.status === 'partially_sold') {
+
+    if (normalizedStatus === 'partially_sold') {
       return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 text-xs">Partial</Badge>;
     }
-    return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 text-xs">In Stock</Badge>;
+
+    if (normalizedStatus === 'sold') {
+      return <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-300 text-xs">Sold</Badge>;
+    }
+
+    return <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-xs">-</Badge>;
   };
 
   const getShapeDisplay = (item: InventoryItem) => {

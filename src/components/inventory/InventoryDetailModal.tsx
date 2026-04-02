@@ -32,20 +32,31 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({
     return `${BASE_URL}/uploads/${imagePath}`;
   };
 
-  const getStatusBadge = () => {
-    const isSold = item.availablePieces === 0 && item.availableWeight === 0;
-    const isPartial = item.availablePieces < item.totalPieces || item.availableWeight < item.totalWeight;
+  const normalizeStatus = (status?: string) => {
+    if (!status) return '';
+    return String(status).trim().toLowerCase().replace(/\s+/g, '_');
+  };
 
-    if (isSold || item.status === 'sold') {
-      return <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-300">Sold</Badge>;
+  const getStatusBadge = () => {
+    const normalizedStatus = normalizeStatus(item.status);
+
+    if (normalizedStatus === 'in_stock') {
+      return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">In Stock</Badge>;
     }
-    if (item.status === 'pending') {
+
+    if (normalizedStatus === 'pending') {
       return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">Pending</Badge>;
     }
-    if (isPartial || item.status === 'partially_sold') {
+
+    if (normalizedStatus === 'partially_sold') {
       return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">Partially Sold</Badge>;
     }
-    return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">In Stock</Badge>;
+
+    if (normalizedStatus === 'sold') {
+      return <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-300">Sold</Badge>;
+    }
+
+    return <Badge variant="outline" className="bg-muted text-muted-foreground border-border">-</Badge>;
   };
 
   const getCuttingStyleDisplay = (code?: string) => {
@@ -53,17 +64,183 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({
     return `${code} - ${CUTTING_STYLES[code as CuttingStyleCode] || code}`;
   };
 
-  const formatDimensions = () => {
-    if (!item.dimensions) return 'N/A';
-    const { min, max, unit } = item.dimensions;
-    const hasMin = (min?.length || 0) > 0 || (min?.width || 0) > 0;
-    const hasMax = (max?.length || 0) > 0 || (max?.width || 0) > 0;
-    if (!hasMin && !hasMax) return 'N/A';
+  const parseDimensionNumber = (value: unknown) => {
+    const parsed = Number.parseFloat(String(value ?? ''));
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
 
-    const parts = [];
-    if (hasMin) parts.push(`${min.length}x${min.width}`);
-    if (hasMax) parts.push(`${max.length}x${max.width}`);
-    return parts.join(' - ') + ` ${unit || 'mm'}`;
+  const parseDimensionString = (value: unknown) => {
+    if (typeof value !== 'string') return undefined;
+
+    const match = value.trim().match(/([0-9]*\.?[0-9]+)\s*[xX]\s*([0-9]*\.?[0-9]+)/);
+    if (!match) return undefined;
+
+    return {
+      length: parseDimensionNumber(match[1]),
+      width: parseDimensionNumber(match[2])
+    };
+  };
+
+  const normalizeDimensionPoint = (value: any) => {
+    if (value === undefined || value === null) return undefined;
+
+    if (typeof value === 'string') {
+      return parseDimensionString(value);
+    }
+
+    if (typeof value !== 'object') {
+      return undefined;
+    }
+
+    const length = parseDimensionNumber(value.length ?? value.l ?? value.len ?? value.dimensionLength);
+    const width = parseDimensionNumber(value.width ?? value.w ?? value.wid ?? value.dimensionWidth);
+
+    if (length <= 0 && width <= 0) {
+      return undefined;
+    }
+
+    return { length, width };
+  };
+
+  const pickDimensionPoint = (
+    source: any,
+    options: { objectKeys?: string[]; lengthKeys?: string[]; widthKeys?: string[] } = {}
+  ) => {
+    const { objectKeys = [], lengthKeys = [], widthKeys = [] } = options;
+
+    for (const key of objectKeys) {
+      const point = normalizeDimensionPoint(source?.[key]);
+      if (point) return point;
+    }
+
+    let length: number | null = null;
+    let width: number | null = null;
+
+    for (const key of lengthKeys) {
+      const value = source?.[key];
+      if (value !== undefined && value !== null && String(value).trim() !== '') {
+        length = parseDimensionNumber(value);
+        break;
+      }
+    }
+
+    for (const key of widthKeys) {
+      const value = source?.[key];
+      if (value !== undefined && value !== null && String(value).trim() !== '') {
+        width = parseDimensionNumber(value);
+        break;
+      }
+    }
+
+    const normalizedLength = length ?? 0;
+    const normalizedWidth = width ?? 0;
+
+    if (normalizedLength <= 0 && normalizedWidth <= 0) {
+      return undefined;
+    }
+
+    return {
+      length: normalizedLength,
+      width: normalizedWidth
+    };
+  };
+
+  const formatDimensionPoint = (point?: { length?: number; width?: number }) => {
+    const length = parseDimensionNumber(point?.length);
+    const width = parseDimensionNumber(point?.width);
+
+    if (length <= 0 && width <= 0) {
+      return null;
+    }
+
+    return `${length}x${width}`;
+  };
+
+  const getMixDimensionBounds = () => {
+    let minLength = Infinity;
+    let minWidth = Infinity;
+    let maxLength = 0;
+    let maxWidth = 0;
+    let hasMin = false;
+    let hasMax = false;
+
+    for (const shape of item.shapes || []) {
+      const minPoint = pickDimensionPoint(shape as any, {
+        objectKeys: ['dimensionMin', 'dimMin', 'dim_min', 'minDimension', 'min_dimension'],
+        lengthKeys: ['dimensionMinLength', 'dimMinLength', 'dim_min_length', 'minLength', 'min_length'],
+        widthKeys: ['dimensionMinWidth', 'dimMinWidth', 'dim_min_width', 'minWidth', 'min_width']
+      });
+      const maxPoint = pickDimensionPoint(shape as any, {
+        objectKeys: ['dimensionMax', 'dimMax', 'dim_max', 'maxDimension', 'max_dimension'],
+        lengthKeys: ['dimensionMaxLength', 'dimMaxLength', 'dim_max_length', 'maxLength', 'max_length'],
+        widthKeys: ['dimensionMaxWidth', 'dimMaxWidth', 'dim_max_width', 'maxWidth', 'max_width']
+      });
+
+      const minLen = parseDimensionNumber(minPoint?.length);
+      const minWid = parseDimensionNumber(minPoint?.width);
+      const maxLen = parseDimensionNumber(maxPoint?.length);
+      const maxWid = parseDimensionNumber(maxPoint?.width);
+
+      if (minLen > 0 || minWid > 0) {
+        hasMin = true;
+        if (minLen > 0) minLength = Math.min(minLength, minLen);
+        if (minWid > 0) minWidth = Math.min(minWidth, minWid);
+      }
+
+      if (maxLen > 0 || maxWid > 0) {
+        hasMax = true;
+        if (maxLen > 0) maxLength = Math.max(maxLength, maxLen);
+        if (maxWid > 0) maxWidth = Math.max(maxWidth, maxWid);
+      }
+    }
+
+    return {
+      min: hasMin
+        ? {
+            length: Number.isFinite(minLength) ? minLength : 0,
+            width: Number.isFinite(minWidth) ? minWidth : 0
+          }
+        : undefined,
+      max: hasMax ? { length: maxLength, width: maxWidth } : undefined
+    };
+  };
+
+  const formatDimensions = () => {
+    const itemAny = item as any;
+    const legacyPoint = normalizeDimensionPoint(itemAny.dimensions);
+
+    let min =
+      pickDimensionPoint(itemAny, {
+        objectKeys: ['dimMin', 'dim_min', 'dimensionMin', 'dimension_min', 'minDimension', 'min_dimension'],
+        lengthKeys: ['dimMinLength', 'dim_min_length', 'dimensionMinLength', 'minLength', 'min_length'],
+        widthKeys: ['dimMinWidth', 'dim_min_width', 'dimensionMinWidth', 'minWidth', 'min_width']
+      }) ||
+      normalizeDimensionPoint(item.dimensions?.min) ||
+      legacyPoint;
+
+    let max =
+      pickDimensionPoint(itemAny, {
+        objectKeys: ['dimMax', 'dim_max', 'dimensionMax', 'dimension_max', 'maxDimension', 'max_dimension'],
+        lengthKeys: ['dimMaxLength', 'dim_max_length', 'dimensionMaxLength', 'maxLength', 'max_length'],
+        widthKeys: ['dimMaxWidth', 'dim_max_width', 'dimensionMaxWidth', 'maxWidth', 'max_width']
+      }) ||
+      normalizeDimensionPoint(item.dimensions?.max) ||
+      legacyPoint;
+
+    if (item.shapeType === 'mix' && item.shapes && item.shapes.length > 0) {
+      const mixBounds = getMixDimensionBounds();
+      if (mixBounds.min || mixBounds.max) {
+        min = mixBounds.min;
+        max = mixBounds.max;
+      }
+    }
+
+    const minText = formatDimensionPoint(min);
+    const maxText = formatDimensionPoint(max);
+
+    if (!minText && !maxText) return 'N/A';
+    if (minText && maxText) return `${minText} — ${maxText}`;
+    return minText || maxText || 'N/A';
   };
 
   const getPriceDisplay = () => {
