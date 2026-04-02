@@ -57,6 +57,8 @@ interface FormData {
   shapes: ShapeFormEntry[];
   totalPieces: string;
   totalWeight: string;
+  lines: string;
+  grossWeight: string;
   purchaseCode: string;
   saleCode: string;
   dimensions: {
@@ -90,6 +92,8 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
     shapes: [],
     totalPieces: '',
     totalWeight: '',
+    lines: '',
+    grossWeight: '',
     purchaseCode: '',
     saleCode: '',
     dimensions: {
@@ -197,6 +201,8 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
           shapes: [],        // intentionally empty — injected in Phase 2
           totalPieces: String(editItem.totalPieces || ''),
           totalWeight: String(editItem.totalWeight || ''),
+          lines: editItem.lines !== undefined && editItem.lines !== null ? String(editItem.lines) : '',
+          grossWeight: editItem.grossWeight !== undefined && editItem.grossWeight !== null ? String(editItem.grossWeight) : '',
           purchaseCode: editItem.purchaseCode || '',
           saleCode: editItem.saleCode || '',
           dimensions: {
@@ -228,6 +234,8 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
           shapes: [],
           totalPieces: '',
           totalWeight: '',
+          lines: '',
+          grossWeight: '',
           purchaseCode: '',
           saleCode: '',
           dimensions: {
@@ -391,6 +399,18 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
               totalWeight: parseFloat(formData.totalWeight) || 0,
             };
 
+      const parsedLines = formData.lines.trim() === '' ? null : Number.parseInt(formData.lines, 10);
+      const parsedGrossWeight = formData.grossWeight.trim() === ''
+        ? null
+        : Number.parseFloat(formData.grossWeight);
+
+      const normalizedLines = Number.isInteger(parsedLines) && parsedLines >= 0
+        ? parsedLines
+        : null;
+      const normalizedGrossWeight = Number.isFinite(parsedGrossWeight) && (parsedGrossWeight ?? -1) >= 0
+        ? parsedGrossWeight
+        : null;
+
       const submitData = {
         category: formData.category || null,
         cuttingStyle: formData.cuttingStyle || '',
@@ -419,6 +439,8 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
 
         totalPieces: derivedTotals.totalPieces,
         totalWeight: derivedTotals.totalWeight,
+          lines: normalizedLines,
+          grossWeight: normalizedGrossWeight,
 
         purchaseCode: formData.purchaseCode,
         saleCode: formData.saleCode,
@@ -665,6 +687,34 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
               </div>
             </div>
           )}
+
+          {/* Optional Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="lines">Lines (optional)</Label>
+              <Input
+                id="lines"
+                type="number"
+                min="0"
+                step="1"
+                value={formData.lines}
+                onChange={(e) => setFormData(prev => ({ ...prev, lines: e.target.value }))}
+                placeholder="Enter line count"
+              />
+            </div>
+            <div>
+              <Label htmlFor="grossWeight">Gross Weight (optional)</Label>
+              <Input
+                id="grossWeight"
+                type="number"
+                min="0"
+                step="0.01"
+                value={formData.grossWeight}
+                onChange={(e) => setFormData(prev => ({ ...prev, grossWeight: e.target.value }))}
+                placeholder="Enter gross weight"
+              />
+            </div>
+          </div>
 
           {/* Dimension Range — Single Shape Lot */}
           {formData.shapeType === 'single' && (

@@ -209,6 +209,24 @@ export const InventoryCardView: React.FC<InventoryCardViewProps> = ({
                 </span>
               </div>
 
+              {/* Lines + Gross Weight */}
+              <div className="flex justify-between text-xs">
+                <span>
+                  <span className="text-muted-foreground">Lines: </span>
+                  <span className="font-medium">
+                    {item.lines !== undefined && item.lines !== null ? item.lines : '-'}
+                  </span>
+                </span>
+                <span>
+                  <span className="text-muted-foreground">Gross Wt: </span>
+                  <span className="font-medium">
+                    {item.grossWeight !== undefined && item.grossWeight !== null
+                      ? `${Number(item.grossWeight).toFixed(2)} ct`
+                      : '-'}
+                  </span>
+                </span>
+              </div>
+
               {/* Purchase & Sale Price */}
               <div className="text-xs space-y-1 py-1 border-y">
                 <div>

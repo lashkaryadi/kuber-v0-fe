@@ -350,6 +350,16 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
     return `${code} - ${CUTTING_STYLES[code as CuttingStyleCode] || code}`;
   };
 
+  const formatOptionalInteger = (value?: number | null) => {
+    if (value === undefined || value === null) return '-';
+    return String(value);
+  };
+
+  const formatOptionalDecimal = (value?: number | null) => {
+    if (value === undefined || value === null) return '-';
+    return Number(value).toFixed(2);
+  };
+
   const SortableHeader: React.FC<{ field: string; children: React.ReactNode }> = ({ field, children }) => {
     const isActive = sortBy === field;
     return (
@@ -407,6 +417,8 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                 </th>
                 <SortableHeader field="availablePieces">Pieces</SortableHeader>
                 <SortableHeader field="availableWeight">Weight (ct)</SortableHeader>
+                <SortableHeader field="lines">Lines</SortableHeader>
+                <SortableHeader field="grossWeight">Gross Wt</SortableHeader>
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-sm">
                   Dimensions
                 </th>
@@ -452,6 +464,12 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                     </span>
                     {' / '}
                     {(item.totalWeight || 0).toFixed(2)}
+                  </td>
+                  <td className="p-4 align-middle">
+                    {formatOptionalInteger(item.lines)}
+                  </td>
+                  <td className="p-4 align-middle">
+                    {formatOptionalDecimal(item.grossWeight)}
                   </td>
                   <td className="p-4 align-middle text-sm text-muted-foreground">
                     {formatDimensions(item)}

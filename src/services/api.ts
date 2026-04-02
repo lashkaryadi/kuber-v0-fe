@@ -49,6 +49,8 @@ export interface InventoryItem {
   shapes: Array<{ shape: string; pieces: number; weight: number }>;
   totalPieces: number;
   totalWeight: number;
+  lines?: number | null;
+  grossWeight?: number | null;
   availablePieces: number;
   availableWeight: number;
   purchaseCode?: string;
@@ -82,6 +84,8 @@ export interface SoldItem {
   }>;
   totalPieces: number;
   totalWeight: number;
+  lines?: number | null;
+  grossWeight?: number | null;
   totalAmount: number;
   customer: { name?: string; email?: string; phone?: string };
   invoiceNumber?: string;
@@ -650,6 +654,8 @@ const sellInventoryItem = async (data: {
   }>;
   customer?: { name?: string; email?: string; phone?: string };
   invoiceNumber?: string;
+  lines?: number | null;
+  grossWeight?: number | null;
 }) => {
   try {
     // Normalize shape field names
@@ -666,6 +672,8 @@ const sellInventoryItem = async (data: {
       soldShapes: normalizedShapes,
       customer: data.customer || {},
       invoiceNumber: data.invoiceNumber || "",
+      lines: data.lines,
+      grossWeight: data.grossWeight,
     });
     return { success: true, data: response.data?.data || response.data, message: response.data?.message };
   } catch (error: unknown) {

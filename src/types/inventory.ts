@@ -55,6 +55,9 @@ export interface InventoryItem {
   totalPieces: number;
   totalWeight: number;
 
+  lines?: number | null;
+  grossWeight?: number | null;
+
   availablePieces: number;
   availableWeight: number;
 

@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Check, X, AlertCircle } from 'lucide-react';
+import { AlertCircle, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/services/api';
 
@@ -48,6 +48,25 @@ export const TallyScanningDialog: React.FC<TallyScanningDialogProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scannedIdsRef = useRef<Set<string>>(new Set());
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 768px)').matches : false
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const mediaQuery = window.matchMedia('(max-width: 768px)');
+    const updateIsMobile = () => setIsMobile(mediaQuery.matches);
+    updateIsMobile();
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', updateIsMobile);
+      return () => mediaQuery.removeEventListener('change', updateIsMobile);
+    }
+
+    mediaQuery.addListener(updateIsMobile);
+    return () => mediaQuery.removeListener(updateIsMobile);
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -95,6 +114,10 @@ export const TallyScanningDialog: React.FC<TallyScanningDialogProps> = ({
 
   const startScanner = async () => {
     try {
+      if (scannerRef.current?.isScanning) {
+        await stopScanner();
+      }
+
       // Query the DOM element with multiple retries
       let element = document.getElementById('tally-qr-reader');
       let attempts = 0;
@@ -116,28 +139,41 @@ export const TallyScanningDialog: React.FC<TallyScanningDialogProps> = ({
       const scanner = new Html5Qrcode('tally-qr-reader');
       scannerRef.current = scanner;
 
-      // Use smaller, adaptive qrbox to avoid canvas errors on mobile
-      const qrboxSize = Math.min(window.innerWidth * 0.6, 150); // 60% of viewport or 150px max
+      const qrboxSize = isMobile ? 250 : Math.min(window.innerWidth * 0.5, 260);
+      const scannerConfig = {
+        fps: 10,
+        qrbox: { width: qrboxSize, height: qrboxSize },
+        aspectRatio: 1.0,
+        disableFlip: false,
+      };
 
-      await scanner.start(
-        { facingMode: 'environment' },
-        {
-          fps: 10,
-          qrbox: { width: qrboxSize, height: qrboxSize },
-          aspectRatio: 1.0,
-          disableFlip: false,
-        },
-        handleScanSuccess,
-        (errorMessage: string) => {
-          // Suppress all non-critical errors to avoid cluttering console
-          // Only log unexpected errors
-          if (errorMessage?.includes('NotFoundException') || 
-              errorMessage?.includes('Not found') ||
-              errorMessage?.includes('IndexSizeError')) {
-            return; // Expected errors during scanning or video initialization
-          }
+      const onScanFailure = (errorMessage: string) => {
+        if (
+          errorMessage?.includes('NotFoundException') ||
+          errorMessage?.includes('Not found') ||
+          errorMessage?.includes('IndexSizeError')
+        ) {
+          return;
         }
-      );
+      };
+
+      try {
+        await scanner.start(
+          { facingMode: { exact: 'environment' } },
+          scannerConfig,
+          handleScanSuccess,
+          onScanFailure
+        );
+      } catch (primaryCameraError) {
+        await scanner.start(
+          { facingMode: 'environment' },
+          scannerConfig,
+          handleScanSuccess,
+          onScanFailure
+        );
+        console.log('Fell back to non-exact environment camera:', primaryCameraError);
+      }
+
       setScanning(true);
       setError(null);
     } catch (err: any) {
@@ -214,10 +250,45 @@ export const TallyScanningDialog: React.FC<TallyScanningDialogProps> = ({
     onOpenChange(false);
   };
 
+  const handleDialogOpenChange = (isOpen: boolean) => {
+    if (!isOpen) {
+      handleClose();
+    }
+  };
+
+  const expectedItems = seriesData?.items || [];
+  const totalExpected = seriesData?.stats?.total || expectedItems.length || 0;
+  const inStockCount = seriesData?.stats?.inStock || 0;
+  const soldCount = seriesData?.stats?.sold || 0;
+  const scannedSet = new Set(scannedItems.map((item) => item.id));
+  const foundSet = new Set((tallyResult?.found || []).map((item: any) => String(item._id)));
+  const missingSet = new Set((tallyResult?.missing || []).map((item: any) => String(item._id)));
+  const missingCount = tallyResult
+    ? tallyResult.missing.length
+    : Math.max(totalExpected - scannedSet.size, 0);
+
+  const packetRows = expectedItems.map((item: any) => {
+    const itemId = String(item._id);
+    const status = tallyResult
+      ? foundSet.has(itemId)
+        ? 'found'
+        : missingSet.has(itemId)
+          ? 'missing'
+          : 'pending'
+      : scannedSet.has(itemId)
+        ? 'found'
+        : 'pending';
+
+    return {
+      item,
+      status,
+    };
+  });
+
   if (!seriesData && loading) {
     return (
-      <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="max-w-2xl">
+      <Dialog open={open} onOpenChange={handleDialogOpenChange}>
+        <DialogContent className={isMobile ? 'tally-container !w-screen !max-w-none !h-[100dvh] !m-0 !p-0 !rounded-none' : 'max-w-2xl'}>
           <DialogHeader>
             <DialogTitle>Loading Series Data...</DialogTitle>
           </DialogHeader>
@@ -230,177 +301,197 @@ export const TallyScanningDialog: React.FC<TallyScanningDialogProps> = ({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>Series Tally: {seriesName}</DialogTitle>
-          <DialogDescription>
-            Expected: {seriesData?.stats?.total || 0} items | Scanned: {scannedItems.length}
-          </DialogDescription>
-        </DialogHeader>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
+      <DialogContent
+        className={isMobile
+          ? 'tally-container !w-screen !max-w-none !h-[100dvh] !m-0 !p-0 !gap-0 !rounded-none !border-0'
+          : 'max-w-5xl'
+        }
+      >
+        {isMobile ? (
+          <div className="tally-container w-full h-[100dvh] max-w-[100vw] overflow-hidden flex flex-col bg-background">
+            <div className="flex items-center justify-between px-4 py-3 border-b bg-background sticky top-0 z-20">
+              <Button
+                variant="ghost"
+                onClick={handleClose}
+                className="h-9 px-2"
+              >
+                <ArrowLeft className="w-4 h-4 mr-1" />
+                Back
+              </Button>
+              <p className="text-[clamp(16px,4vw,24px)] font-semibold truncate px-2">Series: {seriesName}</p>
+              <span className="w-12" />
+            </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Scanner Section */}
-          <div className="space-y-3">
-            {tallyResult ? (
-              // Show results instead of scanner
-              <div className="space-y-3">
-                <div className="p-3 border rounded-lg bg-muted">
-                  <h3 className="font-semibold mb-2">Tally Results</h3>
-                  
-                  <div className="grid grid-cols-2 gap-2 text-sm mb-3">
-                    <div className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-green-600" />
-                      <span>Found: {tallyResult.found.length}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <X className="w-4 h-4 text-red-600" />
-                      <span>Missing: {tallyResult.missing.length}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-yellow-600" />
-                      <span>Extra: {tallyResult.extra.length}</span>
-                    </div>
-                    <div className="font-semibold">
-                      Accuracy: {tallyResult.accuracy}%
-                    </div>
-                  </div>
-
-                  {tallyResult.missing.length > 0 && (
-                    <div className="mb-3">
-                      <p className="text-xs font-medium text-red-600 mb-1">Missing Items:</p>
-                      <div className="text-xs space-y-1">
-                        {tallyResult.missing.slice(0, 3).map((item: any) => (
-                          <div key={item._id} className="text-red-600">
-                            • {item.serialNumber || item._id}
-                          </div>
-                        ))}
-                        {tallyResult.missing.length > 3 && (
-                          <div className="text-muted-foreground">
-                            ... and {tallyResult.missing.length - 3} more
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <Button
-                    onClick={handleReset}
-                    className="w-full"
-                    variant="outline"
-                  >
-                    Start Over
-                  </Button>
+            <div className="px-3 pt-3">
+              <div className="tally-stats-grid grid grid-cols-2 gap-3">
+                <div className="rounded-lg border p-3 bg-card">
+                  <p className="text-xs text-muted-foreground">Total</p>
+                  <p className="text-xl font-semibold">{totalExpected}</p>
+                </div>
+                <div className="rounded-lg border p-3 bg-card">
+                  <p className="text-xs text-muted-foreground">In Stock</p>
+                  <p className="text-xl font-semibold">{inStockCount}</p>
+                </div>
+                <div className="rounded-lg border p-3 bg-card">
+                  <p className="text-xs text-muted-foreground">Sold</p>
+                  <p className="text-xl font-semibold">{soldCount}</p>
+                </div>
+                <div className="rounded-lg border p-3 bg-card">
+                  <p className="text-xs text-muted-foreground">Missing</p>
+                  <p className="text-xl font-semibold">{missingCount}</p>
                 </div>
               </div>
-            ) : (
-              // Scanner view
-              <div className="space-y-3">
+            </div>
+
+            {!tallyResult && (
+              <div className="scan-container relative mx-3 mt-3 rounded-lg overflow-hidden bg-black">
                 <div
                   id="tally-qr-reader"
-                  className="w-full rounded-md overflow-hidden bg-black min-h-[300px] border border-border"
+                  className="camera-view w-full tally-reader"
                 />
-
-                {/* Status Messages */}
-                {scanning && !error && (
-                  <p className="text-sm text-center text-muted-foreground">
-                    Scanning... Hold steady to scan items
-                  </p>
-                )}
-
-                {error && (
-                  <div className="flex gap-3 p-3 bg-red-50 dark:bg-red-950 rounded-md border border-red-200 dark:border-red-800">
-                    <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm">
-                      <p className="font-medium text-red-700 dark:text-red-300">{error}</p>
-                      <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                        💡 On Chrome: Click the 🔒 in address bar → Camera → Allow
-                      </p>
-                    </div>
-                  </div>
-                )}
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <div className="w-[250px] h-[250px] max-w-[68vw] max-h-[68vw] rounded-2xl border-2 border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.22)]" />
+                </div>
               </div>
             )}
-          </div>
 
-          {/* Scanned Items List */}
-          <div className="space-y-3">
-            <div className="p-3 border rounded-lg bg-muted">
-              <h3 className="font-semibold mb-2">
-                Scanned Items ({scannedItems.length})
-              </h3>
-              <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                {scannedItems.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No items scanned yet. Start scanning QR codes.
-                  </p>
+            {error && !tallyResult && (
+              <div className="mx-3 mt-3 flex gap-2 p-2 bg-red-50 rounded-md border border-red-200">
+                <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-red-700">{error}</p>
+              </div>
+            )}
+
+            {tallyResult && (
+              <div className="mx-3 mt-3 p-3 border rounded-lg bg-muted text-sm">
+                <p className="font-semibold">Tally Completed</p>
+                <p className="text-xs text-muted-foreground mt-1">Accuracy: {tallyResult.accuracy}%</p>
+              </div>
+            )}
+
+            <div className="px-3 pt-3 flex-1 min-h-0 overflow-hidden">
+              <p className="text-sm font-semibold mb-2">Packets:</p>
+              <div className="h-full overflow-y-auto border rounded-lg bg-card">
+                {packetRows.length === 0 ? (
+                  <p className="text-sm text-muted-foreground p-3">No packets found for this series.</p>
                 ) : (
-                  scannedItems.map((item, index) => (
+                  packetRows.map(({ item, status }: { item: any; status: string }) => (
                     <div
-                      key={index}
-                      className="text-xs p-2 bg-background border rounded flex items-center gap-2"
+                      key={item._id}
+                      className="px-3 py-2 border-b last:border-b-0 flex items-center gap-2 flex-wrap"
                     >
-                      <Badge variant="outline" className="bg-blue-50">
-                        {index + 1}
+                      <span className="font-mono text-xs flex-1 min-w-0 truncate">{item.serialNumber}</span>
+                      <Badge
+                        className={status === 'found'
+                          ? 'flex-shrink-0 bg-green-100 text-green-800 border-green-300'
+                          : status === 'missing'
+                            ? 'flex-shrink-0 bg-red-100 text-red-800 border-red-300'
+                            : 'flex-shrink-0 bg-slate-100 text-slate-700 border-slate-300'
+                        }
+                        variant="outline"
+                      >
+                        {status === 'found' ? 'Found' : status === 'missing' ? 'Missing' : 'Pending'}
                       </Badge>
-                      <span className="font-mono">{item.sn || item.id.substring(0, 8)}</span>
                     </div>
                   ))
                 )}
               </div>
+            </div>
 
-              <div className="flex gap-2 mt-3">
+            <div className="sticky bottom-4 left-0 right-0 p-3 border-t bg-background">
+              <div className="grid grid-cols-2 gap-2">
                 <Button
-                  onClick={processTally}
-                  disabled={scannedItems.length === 0 || loading}
-                  className="flex-1"
+                  className="tally-scan-btn"
+                  onClick={tallyResult ? handleReset : startScanner}
                 >
-                  {loading ? 'Processing...' : 'Complete Tally'}
+                  {tallyResult ? 'START OVER' : 'SCAN NEXT PACKET'}
                 </Button>
                 <Button
-                  onClick={() => {
-                    const removedId = scannedItems[scannedItems.length - 1]?.id;
-                    if (removedId) {
-                      scannedIdsRef.current.delete(removedId);
-                      setScannedItems((prev) => prev.slice(0, -1));
-                    }
-                  }}
-                  variant="outline"
-                  disabled={scannedItems.length === 0}
+                  variant={tallyResult ? 'outline' : 'secondary'}
+                  className="tally-scan-btn"
+                  onClick={tallyResult ? handleClose : processTally}
+                  disabled={!tallyResult && (scannedItems.length === 0 || loading)}
                 >
-                  Undo
+                  {tallyResult ? 'CLOSE' : (loading ? 'PROCESSING...' : 'COMPLETE TALLY')}
                 </Button>
               </div>
             </div>
+          </div>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>Series Tally: {seriesName}</DialogTitle>
+              <DialogDescription>
+                Expected: {totalExpected} items | Scanned: {scannedItems.length}
+              </DialogDescription>
+            </DialogHeader>
 
-            {/* Expected Stats */}
-            {seriesData && (
-              <div className="p-3 border rounded-lg bg-muted text-sm">
-                <h3 className="font-semibold mb-2">Expected Stats</h3>
-                <div className="space-y-1 text-xs">
-                  <div>Total: {seriesData.stats?.total || 0}</div>
-                  <div>In Stock: {seriesData.stats?.inStock || 0}</div>
-                  <div>Sold: {seriesData.stats?.sold || 0}</div>
-                  <div>On Memo: {seriesData.stats?.onMemo || 0}</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <div
+                  id="tally-qr-reader"
+                  className="w-full rounded-md overflow-hidden bg-black min-h-[320px] border border-border"
+                />
+                {scanning && !error && (
+                  <p className="text-sm text-center text-muted-foreground">
+                    Scanning... Hold steady to scan items.
+                  </p>
+                )}
+                {error && (
+                  <div className="flex gap-3 p-3 bg-red-50 rounded-md border border-red-200">
+                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-700">{error}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <div className="p-3 border rounded-lg bg-muted">
+                  <h3 className="font-semibold mb-2">Packets</h3>
+                  <div className="space-y-2 max-h-[380px] overflow-y-auto">
+                    {packetRows.map(({ item, status }: { item: any; status: string }) => (
+                      <div
+                        key={item._id}
+                        className="text-xs p-2 bg-background border rounded flex items-center justify-between gap-2"
+                      >
+                        <span className="font-mono truncate flex-1 min-w-0">{item.serialNumber}</span>
+                        <Badge
+                          variant="outline"
+                          className={status === 'found'
+                            ? 'bg-green-100 text-green-800 border-green-300'
+                            : status === 'missing'
+                              ? 'bg-red-100 text-red-800 border-red-300'
+                              : 'bg-slate-100 text-slate-700 border-slate-300'
+                          }
+                        >
+                          {status === 'found' ? 'Found' : status === 'missing' ? 'Missing' : 'Pending'}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
+                    <div>Total: {totalExpected}</div>
+                    <div>In Stock: {inStockCount}</div>
+                    <div>Sold: {soldCount}</div>
+                    <div>Missing: {missingCount}</div>
+                  </div>
                 </div>
               </div>
-            )}
-          </div>
-        </div>
+            </div>
 
-        <div className="flex justify-end gap-2 border-t pt-4">
-          {error && !tallyResult && (
-            <Button
-              variant="outline"
-              onClick={startScanner}
-            >
-              Try Again
-            </Button>
-          )}
-          <Button variant="outline" onClick={handleClose}>
-            {tallyResult ? 'Close' : 'Cancel'}
-          </Button>
-        </div>
+            <div className="flex justify-end gap-2 border-t pt-4">
+              <Button variant="outline" onClick={startScanner}>Scan Next Packet</Button>
+              <Button
+                onClick={processTally}
+                disabled={scannedItems.length === 0 || loading}
+              >
+                {loading ? 'Processing...' : 'Complete Tally'}
+              </Button>
+              <Button variant="outline" onClick={handleClose}>Close</Button>
+            </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

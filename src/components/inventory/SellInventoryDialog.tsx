@@ -39,11 +39,16 @@ export const SellInventoryDialog: React.FC<SellInventoryDialogProps> = ({
     phone: ''
   });
   const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [lines, setLines] = useState('');
+  const [grossWeight, setGrossWeight] = useState('');
   const [loading, setLoading] = useState(false);
 
   // Initialize sell shapes based on item type
   useEffect(() => {
     if (open && item) {
+      setLines(item.lines !== undefined && item.lines !== null ? String(item.lines) : '');
+      setGrossWeight(item.grossWeight !== undefined && item.grossWeight !== null ? String(item.grossWeight) : '');
+
       if (item.shapeType === 'single') {
         // Single shape item
         const pricePerCarat = getPricePerCarat(item.saleCode);
@@ -193,6 +198,14 @@ export const SellInventoryDialog: React.FC<SellInventoryDialogProps> = ({
           lineTotal: shape.sellWeight * shape.pricePerCarat
         }));
 
+      const parsedLines = lines.trim() === '' ? null : Number.parseInt(lines, 10);
+      const parsedGrossWeight = grossWeight.trim() === '' ? null : Number.parseFloat(grossWeight);
+
+      const normalizedLines = Number.isInteger(parsedLines) && parsedLines >= 0 ? parsedLines : null;
+      const normalizedGrossWeight = Number.isFinite(parsedGrossWeight) && (parsedGrossWeight ?? -1) >= 0
+        ? parsedGrossWeight
+        : null;
+
       const response = await api.sellInventoryItem({
         inventoryId: item._id,
         soldShapes: selectedShapes,
@@ -201,7 +214,9 @@ export const SellInventoryDialog: React.FC<SellInventoryDialogProps> = ({
           email: customer.email || undefined,
           phone: customer.phone || undefined
         },
-        invoiceNumber: invoiceNumber || undefined
+        invoiceNumber: invoiceNumber || undefined,
+        lines: normalizedLines,
+        grossWeight: normalizedGrossWeight
       });
 
       if (response.success) {
@@ -353,6 +368,37 @@ export const SellInventoryDialog: React.FC<SellInventoryDialogProps> = ({
               <div>
                 <span className="text-sm text-muted-foreground">Total Amount:</span>
                 <p className="text-xl font-bold text-green-600">${totalSold.amount.toFixed(2)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Optional Metrics */}
+          <div className="space-y-4">
+            <h4 className="font-medium">Lines & Gross Weight (Optional)</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="lines">Lines</Label>
+                <Input
+                  id="lines"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={lines}
+                  onChange={(e) => setLines(e.target.value)}
+                  placeholder="Enter line count"
+                />
+              </div>
+              <div>
+                <Label htmlFor="grossWeight">Gross Weight</Label>
+                <Input
+                  id="grossWeight"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={grossWeight}
+                  onChange={(e) => setGrossWeight(e.target.value)}
+                  placeholder="Enter gross weight"
+                />
               </div>
             </div>
           </div>
