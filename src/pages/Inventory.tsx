@@ -268,11 +268,147 @@ export const Inventory = () => {
     <MainLayout title="Inventory">
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 sm:gap-0">
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
             Inventory
           </h1>
-          <div className="flex gap-2 flex-wrap justify-end">
+          
+          {/* Mobile Button Layout - Hidden on desktop */}
+          <div className="sm:hidden inventory-actions-mobile space-y-2 w-full">
+            {/* Row 1 - Add Item (full width, primary) */}
+            <Button
+              onClick={() => setIsAddDialogOpen(true)}
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-11 font-semibold"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Item
+            </Button>
+            
+            {/* Row 2 - Export & Import */}
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                onClick={handleExport}
+                className="border-input hover:bg-accent hover:text-accent-foreground h-10 text-sm"
+                title="Export all inventory items"
+              >
+                <Download className="w-4 h-4 mr-1" />
+                <span className="hidden xs:inline">Export</span>
+              </Button>
+              <Button
+                variant="secondary"
+                className="bg-secondary hover:bg-secondary/80 h-10 text-sm"
+                onClick={() => csvInputRef.current?.click()}
+                title="Import CSV file"
+              >
+                <Upload className="w-4 h-4 mr-1" />
+                <span className="hidden xs:inline">Import</span>
+              </Button>
+            </div>
+            
+            {/* Row 3 - Excel+QR, Template, QR Labels */}
+            <div className="grid grid-cols-3 gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    const params = getFilterParams();
+                    await api.exportInventoryExcelWithQR(params);
+                    toast.success(hasActiveFilters ? `${totalItems} items exported` : "Exported with QR");
+                  } catch {
+                    toast.error("Failed to export");
+                  }
+                }}
+                title="Excel with QR codes"
+                className="h-10 text-xs p-1"
+              >
+                <QrCode className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await api.downloadCSVTemplate();
+                    toast.success("Template downloaded");
+                  } catch {
+                    toast.error("Failed to download");
+                  }
+                }}
+                title="Download CSV template"
+                className="h-10 text-xs p-1"
+              >
+                <FileDown className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    const params = getFilterParams();
+                    await api.downloadQRLabelsPDF(params);
+                    toast.success("QR labels downloaded");
+                  } catch {
+                    toast.error("Failed to download");
+                  }
+                }}
+                title="Download QR labels PDF"
+                className="h-10 text-xs p-1"
+              >
+                <QrCode className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            {/* Row 4 - Scan & Series Tally */}
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsScannerOpen(true)}
+                title="Scan QR code"
+                className="h-10 text-sm"
+              >
+                <ScanLine className="w-4 h-4 mr-1" />
+                Scan
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (seriesList.length === 0) {
+                    toast.error("No series available");
+                    return;
+                  }
+                  if (seriesList.length === 1) {
+                    setSelectedSeriesId(seriesList[0]._id);
+                    setSelectedSeriesName(seriesList[0].name);
+                    setIsSeriesTallyOpen(true);
+                  } else {
+                    setIsSeriesTallyOpen(true);
+                  }
+                }}
+                title="Series Tally"
+                className="h-10 text-sm"
+              >
+                <Pill className="w-4 h-4 mr-1" />
+                Tally
+              </Button>
+            </div>
+          </div>
+
+          {/* Hidden CSV Input */}
+          <input
+            ref={csvInputRef}
+            type="file"
+            accept=".csv"
+            onChange={handleCSVImport}
+            className="hidden"
+            aria-label="Import CSV file"
+          />
+
+          {/* Desktop Button Layout - Hidden on mobile */}
+          <div className="hidden sm:flex gap-2 flex-wrap justify-end">
             <Button
               variant="outline"
               onClick={handleExport}
@@ -375,13 +511,6 @@ export const Inventory = () => {
               <Pill className="w-4 h-4 mr-1" />
               Series Tally
             </Button>
-            <input
-              ref={csvInputRef}
-              type="file"
-              accept=".csv"
-              onChange={handleCSVImport}
-              className="hidden"
-            />
             <Button
               onClick={() => setIsAddDialogOpen(true)}
               className="bg-primary hover:bg-primary/90 text-primary-foreground"

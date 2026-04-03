@@ -110,20 +110,19 @@ export const QRScannerDialog: React.FC<QRScannerDialogProps> = ({
       };
 
       try {
-        await scanner.start(
-          { facingMode: { exact: 'environment' } },
-          scannerConfig,
-          handleScanSuccess,
-          onScanFailure
-        );
-      } catch (primaryCameraError) {
+        // Use soft constraint for back camera (environment) - works on all devices
         await scanner.start(
           { facingMode: 'environment' },
           scannerConfig,
           handleScanSuccess,
           onScanFailure
         );
-        console.log('Fell back to non-exact environment camera:', primaryCameraError);
+        console.log('Camera started: back camera (environment facingMode)');
+      } catch (cameraError) {
+        console.error('Failed to access back camera:', cameraError);
+        // Only throw error - don't attempt fallback to selfie camera
+        setError('Could not access back camera. Please check camera permissions.');
+        throw cameraError;
       }
 
       setScanning(true);
@@ -236,119 +235,139 @@ export const QRScannerDialog: React.FC<QRScannerDialogProps> = ({
     onOpenChange(isOpen);
   };
 
+  // Mobile full-screen overlay rendering
+  if (isMobile && open) {
+    return (
+      <>
+        <div className="fixed inset-0 bg-black z-[9998]" />
+        <div className="fixed inset-0 z-[9999] flex flex-col bg-black">
+          {/* Fixed Header */}
+          <div className="fixed top-0 left-0 right-0 h-16 flex items-center justify-between px-4 bg-black/95 border-b border-white/10 z-[10001]">
+            <button
+              onClick={() => handleDialogOpenChange(false)}
+              className="flex items-center gap-2 text-white hover:bg-white/10 px-2 py-2 rounded-md transition"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <p className="text-base font-semibold text-white">Scan QR Code</p>
+            <span className="w-12" />
+          </div>
+
+          {/* Camera View - fills remaining height */}
+          <div className="flex-1 mt-16 relative bg-black flex items-center justify-center overflow-hidden">
+            <div
+              id="qr-reader"
+              className="absolute inset-0 w-full h-full"
+            />
+            
+            {/* Targeting overlay */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-[250px] h-[250px] rounded-2xl border-[3px] border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]" />
+              <p className="absolute bottom-8 left-0 right-0 text-center text-white text-sm font-medium">
+                Point camera at QR code
+              </p>
+            </div>
+          </div>
+
+          {/* Fixed Result Panel - Bottom */}
+          <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl p-4 shadow-lg z-[10000]">
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Scan Status</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  {scanning ? 'Scanning... Hold the QR code steady.' : 'Scanner ready.'}
+                </p>
+              </div>
+
+              {error && (
+                <div className="flex gap-2 p-2 bg-red-50 rounded-lg border border-red-200">
+                  <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-red-700">{error}</p>
+                </div>
+              )}
+
+              <div>
+                <p className="text-xs text-slate-500">Last Result:</p>
+                <p className="text-sm font-medium text-slate-900 truncate mt-1">{lastScanResult}</p>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  className="flex-1 h-12 bg-primary text-white"
+                  onClick={() => setDetailOpen(true)}
+                  disabled={!foundItem}
+                >
+                  View Details
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 h-12"
+                  onClick={startScanner}
+                >
+                  Scan Again
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {foundItem && (
+          <InventoryDetailModal
+            item={foundItem}
+            open={detailOpen}
+            onOpenChange={handleCloseDetail}
+          />
+        )}
+      </>
+    );
+  }
+
+  // Desktop dialog rendering
   return (
     <>
       <Dialog open={open} onOpenChange={handleDialogOpenChange}>
-        <DialogContent
-          className={isMobile
-            ? 'scan-container scan-overlay !w-screen !max-w-none !h-[100dvh] !m-0 !p-0 !gap-0 !rounded-none !border-0'
-            : 'max-w-md'
-          }
-        >
-          {isMobile ? (
-            <div className="scan-container scan-overlay scan-mobile-shell">
-              <div className="w-full flex items-center justify-between px-4 py-3 text-white border-b border-white/10 bg-black/90 sticky top-0 z-[10001]">
-                <Button
-                  variant="ghost"
-                  onClick={() => handleDialogOpenChange(false)}
-                  className="h-9 px-2 text-white hover:bg-white/10"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-1" />
-                  Back
-                </Button>
-                <p className="text-[clamp(16px,4vw,24px)] font-semibold">Scan</p>
-                <span className="w-12" />
-              </div>
+        <DialogContent className="max-w-md">
+          <>
+            <DialogHeader>
+              <DialogTitle>Scan QR Code</DialogTitle>
+              <DialogDescription>
+                Point your camera at an inventory QR code to look up the item.
+              </DialogDescription>
+            </DialogHeader>
 
-              <div className="relative w-full camera-view bg-black">
-                <div
-                  id="qr-reader"
-                  className="w-full h-full scan-reader"
-                />
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                  <div className="w-[250px] h-[250px] max-w-[68vw] max-h-[68vw] rounded-2xl border-2 border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.25)]" />
-                </div>
-              </div>
+            <div className="space-y-3">
+              <div
+                id="qr-reader"
+                className="w-full rounded-md overflow-hidden bg-black min-h-[320px] border border-border"
+              />
 
-              <div className="scan-result-panel">
-                <p className="text-sm font-semibold text-slate-900">Point at QR code</p>
-                <p className="text-xs text-slate-500 mt-1">
-                  {scanning ? 'Scanning... Hold the QR code steady.' : 'Scanner paused.'}
+              {scanning && !error && (
+                <p className="text-sm text-center text-muted-foreground">
+                  Scanning... Hold the QR code steady in the frame.
                 </p>
+              )}
 
-                {error && (
-                  <div className="flex gap-2 p-2 mt-3 bg-red-50 rounded-md border border-red-200">
-                    <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-red-700">{error}</p>
+              {error && (
+                <div className="flex gap-3 p-3 bg-red-50 dark:bg-red-950 rounded-md border border-red-200 dark:border-red-800">
+                  <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium text-red-700 dark:text-red-300">{error}</p>
+                    <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                      On Chrome: Click the lock icon in address bar then allow camera access.
+                    </p>
                   </div>
-                )}
-
-                <div className="mt-3">
-                  <p className="text-xs text-slate-500">Last scan result:</p>
-                  <p className="text-sm font-medium text-slate-900 truncate">{lastScanResult}</p>
                 </div>
+              )}
 
-                <div className="mt-3 flex gap-2">
-                  <Button
-                    className="w-full h-12 text-base"
-                    onClick={() => setDetailOpen(true)}
-                    disabled={!foundItem}
-                  >
-                    View Item Detail
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full h-12"
-                    onClick={startScanner}
-                  >
-                    Scan Again
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <>
-              <DialogHeader>
-                <DialogTitle>Scan QR Code</DialogTitle>
-                <DialogDescription>
-                  Point your camera at an inventory QR code to look up the item.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-3">
-                <div
-                  id="qr-reader"
-                  className="w-full rounded-md overflow-hidden bg-black min-h-[320px] border border-border"
-                />
-
-                {scanning && !error && (
-                  <p className="text-sm text-center text-muted-foreground">
-                    Scanning... Hold the QR code steady in the frame.
-                  </p>
-                )}
-
-                {error && (
-                  <div className="flex gap-3 p-3 bg-red-50 dark:bg-red-950 rounded-md border border-red-200 dark:border-red-800">
-                    <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm">
-                      <p className="font-medium text-red-700 dark:text-red-300">{error}</p>
-                      <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                        On Chrome: Click the lock icon in address bar then allow camera access.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="p-3 rounded-md border bg-muted/40">
-                  <p className="text-xs text-muted-foreground">Last scan result:</p>
-                  <p className="text-sm font-medium truncate">{lastScanResult}</p>
-                </div>
+              <div className="p-3 rounded-md border bg-muted/40">
+                <p className="text-xs text-muted-foreground">Last scan result:</p>
+                <p className="text-sm font-medium truncate">{lastScanResult}</p>
               </div>
 
               <div className="flex justify-end gap-2">
                 <Button
-                  onClick={() => setDetailOpen(true)}
                   disabled={!foundItem}
+                  onClick={() => setDetailOpen(true)}
                 >
                   View Item Detail
                 </Button>
@@ -365,16 +384,16 @@ export const QRScannerDialog: React.FC<QRScannerDialogProps> = ({
                   Close
                 </Button>
               </div>
-            </>
-          )}
+            </div>
+          </>
         </DialogContent>
       </Dialog>
 
       {foundItem && (
         <InventoryDetailModal
+          item={foundItem}
           open={detailOpen}
           onOpenChange={handleCloseDetail}
-          item={foundItem}
         />
       )}
     </>

@@ -176,6 +176,24 @@
   }
 }
 
+/* Inventory page mobile button layout */
+@media (max-width: 1024px) {
+  .inventory-actions-mobile {
+    display: space-y-2;
+  }
+}
+
+/* Ensure full viewport coverage for modals */
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
@@ -197,6 +215,7 @@
   }
 }
 
+/* QR Scanner Styles */
 .scan-container {
   width: 100%;
   max-width: 100vw;
@@ -262,12 +281,23 @@
   font-size: 18px;
 }
 
+/* Mobile-specific responsive styles */
 @media (max-width: 768px) {
+  /* Full viewport coverage for fixed overlays */
+  body,
+  #root {
+    overflow: hidden;
+  }
+
+  /* Scan page mobile styles */
   .scan-container {
     width: 100vw !important;
     height: 100vh !important;
     padding: 0 !important;
     margin: 0 !important;
+    position: fixed;
+    top: 0;
+    left: 0;
   }
 
   .scan-overlay {
@@ -278,12 +308,15 @@
     bottom: 0;
     z-index: 9999;
     background: #000;
+    width: 100vw;
+    height: 100vh;
   }
 
   .camera-view {
     width: 100% !important;
     height: 60vh !important;
     object-fit: cover;
+    position: absolute;
   }
 
   .scan-result-panel {
@@ -295,21 +328,87 @@
     border-radius: 20px 20px 0 0;
     padding: 20px 16px;
     z-index: 10000;
+    max-height: 40vh;
+    overflow-y: auto;
   }
 
+  /* Tally page mobile styles */
   .tally-container {
     width: 100% !important;
     padding: 12px !important;
+    display: flex;
+    flex-direction: column;
   }
 
   .tally-stats-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 8px !important;
+    padding: 0 !important;
   }
 
   .tally-scan-btn {
     width: 100% !important;
     height: 56px !important;
-    font-size: 18px !important;
+    font-size: 16px !important;
+    padding: 8px !important;
+  }
+
+  /* Table responsiveness */
+  table {
+    font-size: 14px;
+  }
+
+  /* Hide less important table columns on mobile */
+  .table-cell-cutStyle,
+  .table-cell-series,
+  .table-cell-shapes,
+  .table-cell-dimensions,
+  .table-cell-purchasePrice,
+  .table-cell-salePrice {
+    display: none;
+  }
+
+  /* Make action icons touch-friendly */
+  .action-icons button {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 6px;
+  }
+
+  /* Ensure buttons are touch-sized */
+  button {
+    min-height: 44px;
+  }
+
+  /* Mobile-friendly modal/dialog overrides */
+  [role="dialog"] {
+    max-width: 100vw;
+    width: 100vw;
+    max-height: 100vh;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+  }
+
+  /* Inventory page search bar mobile */
+  .inventory-search {
+    width: 100% !important;
+  }
+
+  /* Prevent layout shift on mobile */
+  html {
+    overflow-y: auto;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* Disable text selection on cameras */
+  #qr-reader,
+  #tally-qr-reader {
+    user-select: none;
+    -webkit-user-select: none;
   }
 }
 
