@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Eye, Edit, ShoppingCart, Trash2, Merge } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { InventoryItem, Category, CUTTING_STYLES, CuttingStyleCode } from '@/types/inventory';
+import { InventoryItem, Category, Series, CUTTING_STYLES, CuttingStyleCode } from '@/types/inventory';
 import { AddInventoryDialog } from './AddInventoryDialog';
 import { SellInventoryDialog } from './SellInventoryDialog';
 import { MergePacketDialog } from './MergePacketDialog';
@@ -16,6 +16,7 @@ interface InventoryCardViewProps {
   loading: boolean;
   onRefresh: () => void;
   categories?: Category[];
+  seriesList?: Series[];
 }
 
 export const InventoryCardView: React.FC<InventoryCardViewProps> = ({
@@ -23,6 +24,7 @@ export const InventoryCardView: React.FC<InventoryCardViewProps> = ({
   loading,
   onRefresh,
   categories = [],
+  seriesList = [],
 }) => {
   const { user } = useAuth();
   const [viewItem, setViewItem] = useState<InventoryItem | undefined>();
@@ -38,12 +40,79 @@ export const InventoryCardView: React.FC<InventoryCardViewProps> = ({
 
   const isAdmin = user?.role === 'admin';
 
+  const normalizeStatus = (status?: string) => {
+    if (!status) return '';
+    return status.toString().trim().toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+  };
+
+  const getReferenceId = (value: any): string => {
+    if (!value) return '';
+    if (typeof value === 'string') return value.trim();
+    return String(value?._id || value?.id || '').trim();
+  };
+
+  const getReferenceName = (value: any): string => {
+    if (!value || typeof value === 'string') return '';
+    return String(value?.name || '').trim();
+  };
+
+  const getCategoryLabel = (item: InventoryItem) => {
+    const directName = getReferenceName(item.category);
+    if (directName) {
+      return directName;
+    }
+
+    const categoryId = getReferenceId(item.category);
+    if (!categoryId) {
+      return 'Uncategorized';
+    }
+
+    const match = categories.find((category) => {
+      const id = String((category as any)?._id || (category as any)?.id || '').trim();
+      return id === categoryId;
+    });
+
+    return match?.name || 'Uncategorized';
+  };
+
+  const getSeriesLabel = (item: InventoryItem) => {
+    const directName = getReferenceName(item.series);
+    if (directName) {
+      return directName;
+    }
+
+    const seriesId = getReferenceId(item.series);
+    if (!seriesId) {
+      return '-';
+    }
+
+    const match = seriesList.find((series) => {
+      const id = String((series as any)?._id || (series as any)?.id || '').trim();
+      return id === seriesId;
+    });
+
+    return match?.name || '-';
+  };
+
+  const getSerialDisplay = (item: InventoryItem) => {
+    const explicit = String(item.serialNumber || '').trim();
+    if (explicit) {
+      return explicit;
+    }
+
+    const idToken = String(item._id || (item as any).id || '')
+      .replace(/[^A-Za-z0-9]/g, '')
+      .toUpperCase()
+      .slice(-6);
+    return idToken ? `#${idToken}` : '-';
+  };
+
   const handleDelete = async (item: InventoryItem) => {
     if (!isAdmin) {
       toast.error('Only admins can delete inventory items');
       return;
     }
-    if (!confirm(`Are you sure you want to delete item ${item.serialNumber}?`)) return;
+    if (!confirm(`Are you sure you want to delete item ${getSerialDisplay(item)}?`)) return;
 
     setDeletingId(item._id);
     try {
@@ -63,19 +132,22 @@ export const InventoryCardView: React.FC<InventoryCardViewProps> = ({
   };
 
   const getStatusBadge = (item: InventoryItem) => {
-    const isSold = item.availablePieces === 0 && item.availableWeight === 0;
-    const isPartial = item.availablePieces < item.totalPieces || item.availableWeight < item.totalWeight;
+    const normalizedStatus = item.status?.toString().trim().toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
 
-    if (isSold || item.status === 'sold') {
-      return <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-300 text-xs">Sold</Badge>;
+    if (normalizedStatus === 'in_stock') {
+      return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 text-xs">In Stock</Badge>;
     }
-    if (item.status === 'pending') {
+    if (normalizedStatus === 'pending') {
       return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300 text-xs">Pending</Badge>;
     }
-    if (isPartial || item.status === 'partially_sold') {
-      return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 text-xs">Partial</Badge>;
+    if (normalizedStatus === 'partially_sold') {
+      return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 text-xs">Partially Sold</Badge>;
     }
-    return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 text-xs">In Stock</Badge>;
+    if (normalizedStatus === 'sold') {
+      return <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-300 text-xs">Sold</Badge>;
+    }
+
+    return <Badge variant="outline" className="bg-muted text-muted-foreground border-muted-foreground/20 text-xs">-</Badge>;
   };
 
   const getShapeDisplay = (item: InventoryItem) => {
@@ -87,7 +159,13 @@ export const InventoryCardView: React.FC<InventoryCardViewProps> = ({
     return 'N/A';
   };
 
-  const canSell = (item: InventoryItem) => item.availablePieces > 0 || item.availableWeight > 0;
+  const canSell = (item: InventoryItem) => {
+    const normalizedStatus = normalizeStatus(item.status);
+    if (normalizedStatus === 'sold') {
+      return false;
+    }
+    return item.availablePieces > 0 || item.availableWeight > 0;
+  };
 
   const handleImageError = (itemId: string, imageUrl: string) => {
     console.warn(`Image failed to load for item ${itemId}:`, imageUrl);
@@ -143,7 +221,7 @@ export const InventoryCardView: React.FC<InventoryCardViewProps> = ({
               <div className="h-36 bg-muted overflow-hidden">
                 <img
                   src={getImageUrl(item.images[0])}
-                  alt={item.serialNumber}
+                  alt={getSerialDisplay(item)}
                   className="w-full h-full object-cover"
                   onLoad={() => handleImageLoad(item._id, item.images[0])}
                   onError={() => handleImageError(item._id, item.images[0])}
@@ -152,7 +230,7 @@ export const InventoryCardView: React.FC<InventoryCardViewProps> = ({
             ) : (
               <div className="h-36 bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center">
                 <span className="text-5xl font-bold text-muted-foreground/30">
-                  {item.category?.name?.charAt(0) || 'G'}
+                  {getCategoryLabel(item).charAt(0) || 'G'}
                 </span>
               </div>
             )}
@@ -161,13 +239,14 @@ export const InventoryCardView: React.FC<InventoryCardViewProps> = ({
             <div className="p-3 space-y-2">
               {/* Serial + Status */}
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-sm truncate">{item.serialNumber}</span>
+                <span className="font-semibold text-sm truncate">{getSerialDisplay(item)}</span>
                 {getStatusBadge(item)}
               </div>
 
               {/* Category + Cutting Style */}
               <div className="text-xs text-muted-foreground space-y-0.5">
-                <p>{item.category?.name || 'Uncategorized'}</p>
+                <p>{getCategoryLabel(item)}</p>
+                <p>Series: {getSeriesLabel(item)}</p>
                 {item.cuttingStyle && (
                   <p>{item.cuttingStyle} - {CUTTING_STYLES[item.cuttingStyle as CuttingStyleCode] || item.cuttingStyle}</p>
                 )}
@@ -197,6 +276,24 @@ export const InventoryCardView: React.FC<InventoryCardViewProps> = ({
                   <span className="text-muted-foreground">/{item.totalPieces}</span>
                 </span>
               </div>
+
+              {/* Lines & Gross Weight */}
+              {(item.lines || item.grossWeight) && (
+                <div className="text-xs space-y-0.5 py-1 border-y">
+                  {item.lines && (
+                    <div>
+                      <span className="text-muted-foreground">Lines: </span>
+                      <span className="font-medium">{item.lines}</span>
+                    </div>
+                  )}
+                  {item.grossWeight && (
+                    <div>
+                      <span className="text-muted-foreground">G.Wt: </span>
+                      <span className="font-medium">{Number(item.grossWeight).toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Purchase & Sale Price */}
               <div className="text-xs space-y-1 py-1 border-y">

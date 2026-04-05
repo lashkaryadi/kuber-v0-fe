@@ -32,6 +32,31 @@ export const SellInventoryDialog: React.FC<SellInventoryDialogProps> = ({
   item,
   onSuccess
 }) => {
+  const getSerialDisplay = () => {
+    const explicit = String(item.serialNumber || '').trim();
+    if (explicit) return explicit;
+
+    const idToken = String(item._id || '')
+      .replace(/[^A-Za-z0-9]/g, '')
+      .toUpperCase()
+      .slice(-6);
+    return idToken ? `#${idToken}` : '-';
+  };
+
+  const getCategoryDisplay = () => {
+    if (!item.category) return 'Uncategorized';
+    if (typeof item.category === 'string') {
+      const trimmed = item.category.trim();
+      return trimmed || 'Uncategorized';
+    }
+
+    const name = String(item.category?.name || '').trim();
+    if (name) return name;
+
+    const id = String((item.category as any)?._id || (item.category as any)?.id || '').trim();
+    return id || 'Uncategorized';
+  };
+
   const [sellShapes, setSellShapes] = useState<SellShape[]>([]);
   const [customer, setCustomer] = useState({
     name: '',
@@ -226,7 +251,7 @@ export const SellInventoryDialog: React.FC<SellInventoryDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Sell Inventory — {item.serialNumber}</DialogTitle>
+          <DialogTitle>Sell Inventory — {getSerialDisplay()}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -235,7 +260,7 @@ export const SellInventoryDialog: React.FC<SellInventoryDialogProps> = ({
             <div className="grid grid-cols-3 gap-4 text-sm">
               <div>
                 <span className="text-muted-foreground">Category: </span>
-                <span className="font-medium">{item.category?.name || 'N/A'}</span>
+                <span className="font-medium">{getCategoryDisplay()}</span>
               </div>
               <div>
                 <span className="text-muted-foreground">Shape Type: </span>

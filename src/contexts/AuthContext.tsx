@@ -16,32 +16,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const token = api.getToken();
-    const storedUser = localStorage.getItem('user');
+    const initializeAuth = async () => {
+      const token = api.getToken();
 
-    if (token && storedUser) {
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+
       try {
-        setUser(JSON.parse(storedUser));
+        const verification = await api.verifyAuthToken(token);
+        if (verification?.success && verification.user) {
+          setUser(verification.user);
+          localStorage.setItem('user', JSON.stringify(verification.user));
+        } else {
+          api.logout();
+          setUser(null);
+        }
       } catch {
         api.logout();
+        setUser(null);
+      } finally {
+        setIsLoading(false);
       }
-    }
-    setIsLoading(false);
+    };
+
+    void initializeAuth();
   }, []);
 
   const login = async (email: string, password: string) => {
     try {
       const data = await api.login(email, password);
+      const token = data.accessToken || data.token;
 
-      api.setToken(data.accessToken);
-      setUser(data.user);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      if (token) {
+        api.setToken(token);
+      }
+
+      if (data.user) {
+        setUser(data.user);
+        localStorage.setItem('user', JSON.stringify(data.user));
+      }
 
       return { success: true };
 
     } catch (err: unknown) {
       const errorResponse = err && typeof err === 'object' && 'response' in err ? (err as { response: { data?: { message?: string; requiresVerification?: boolean; email?: string } } }).response : null;
-      const errorMessage = errorResponse?.data?.message || 'Login failed';
+      const errorMessage = errorResponse?.data?.message || (err instanceof Error ? err.message : 'Login failed');
 
       if (errorResponse?.data?.requiresVerification) {
         return {

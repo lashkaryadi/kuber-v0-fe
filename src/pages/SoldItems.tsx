@@ -85,6 +85,15 @@ export default function SoldItems() {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    const handleDataChanged = () => {
+      fetchData(true);
+    };
+
+    window.addEventListener("kuber-data-changed", handleDataChanged);
+    return () => window.removeEventListener("kuber-data-changed", handleDataChanged);
+  }, [fetchData]);
+
   // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {

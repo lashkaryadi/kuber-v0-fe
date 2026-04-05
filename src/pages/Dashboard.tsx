@@ -43,18 +43,22 @@ export default function Dashboard() {
 
     const response = await api.getDashboardStats();
 
-    if (response.error) {
+    if (!response.success) {
       toast({
         title: "Error",
-        description: response.error,
+        description: response.error || "Failed to fetch dashboard stats",
         variant: "destructive",
       });
       setStats({
         totalInventory: 0,
         in_stockItems: 0,
+        partiallySoldItems: 0,
         soldItems: 0,
         pendingApproval: 0,
         totalValue: 0,
+        totalWeight: 0,
+        totalPieces: 0,
+        totalSalesAmount: 0,
         inStockValue: "-",
         recentSales: [],
       });
@@ -78,6 +82,16 @@ export default function Dashboard() {
     }, REFRESH_INTERVAL);
 
     return () => clearInterval(interval);
+  }, [fetchDashboardData]);
+
+  // Refresh dashboard after any desktop data mutation.
+  useEffect(() => {
+    const handleDataChanged = () => {
+      fetchDashboardData(true);
+    };
+
+    window.addEventListener("kuber-data-changed", handleDataChanged);
+    return () => window.removeEventListener("kuber-data-changed", handleDataChanged);
   }, [fetchDashboardData]);
 
   const recentSalesColumns: Column<SoldItem>[] = [

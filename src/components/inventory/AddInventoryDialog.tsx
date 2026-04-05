@@ -67,12 +67,20 @@ interface FormData {
   certification: string;
   location: string;
   mineName: string;
+  lines: string;
+  grossWeight: string;
   status: string;
   description: string;
   images: string[];
 }
 
 const emptyDimRange = (): DimRange => ({ length: '', width: '' });
+
+const getEntityId = (value: any): string => {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  return value._id || value.id || '';
+};
 
 export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
   open,
@@ -100,6 +108,8 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
     certification: '',
     location: '',
     mineName: '',
+    lines: '',
+    grossWeight: '',
     status: 'in_stock',
     description: '',
     images: []
@@ -131,7 +141,17 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
   const fetchSeries = async () => {
     const response = await api.getSeries({ limit: 100 });
     if (response.success) {
-      setSeriesList(response.data);
+      const normalized = Array.isArray(response.data)
+        ? response.data
+            .map((series: any) => {
+              const id = String(series?._id || series?.id || '').trim();
+              const name = String(series?.name || '').trim();
+              if (!id || !name) return null;
+              return { _id: id, name };
+            })
+            .filter(Boolean) as SeriesItem[]
+        : [];
+      setSeriesList(normalized);
     }
   };
 
@@ -150,8 +170,9 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
       setNewSeriesName('');
       setShowNewSeries(false);
       await fetchSeries();
-      if (response.data?._id) {
-        setFormData(prev => ({ ...prev, series: response.data._id }));
+      const createdId = response.data?._id || response.data?.id;
+      if (createdId) {
+        setFormData(prev => ({ ...prev, series: String(createdId) }));
       }
     } else {
       toast.error(response.message || 'Failed to create series');
@@ -189,9 +210,9 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
         };
 
         setFormData({
-          category: editItem.category?._id || '',
+          category: getEntityId(editItem.category),
           cuttingStyle: editItem.cuttingStyle || '',
-          series: editItem.series?._id || '',
+          series: getEntityId(editItem.series),
           shapeType: editItem.shapeType,
           singleShape: '',   // intentionally empty — injected in Phase 2
           shapes: [],        // intentionally empty — injected in Phase 2
@@ -213,6 +234,8 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
           certification: editItem.certification || '',
           location: editItem.location || '',
           mineName: editItem.mineName || '',
+          lines: String(editItem.lines || ''),
+          grossWeight: String(editItem.grossWeight || ''),
           status: editItem.status || 'in_stock',
           description: editItem.description || '',
           images: editItem.images || []
@@ -238,6 +261,8 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
           certification: '',
           location: '',
           mineName: '',
+          lines: '',
+          grossWeight: '',
           status: 'in_stock',
           description: '',
           images: []
@@ -438,6 +463,8 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
         certification: formData.certification,
         location: formData.location,
         mineName: formData.mineName,
+        lines: formData.lines ? parseInt(formData.lines, 10) : null,
+        grossWeight: formData.grossWeight ? parseFloat(formData.grossWeight) : null,
         status: formData.status,
         description: formData.description,
         images: formData.images,
@@ -850,6 +877,37 @@ export const AddInventoryDialog: React.FC<AddInventoryDialogProps> = ({
                 onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
                 placeholder="e.g., New York, Mumbai"
               />
+            </div>
+          </div>
+
+          {/* Additional Details: Lines & Gross Weight */}
+          <div>
+            <p className="text-sm font-semibold text-muted-foreground mb-3">Additional Details</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="lines">Lines <span className="text-xs font-normal text-muted-foreground">(optional)</span></Label>
+                <Input
+                  id="lines"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={formData.lines}
+                  onChange={(e) => setFormData(prev => ({ ...prev, lines: e.target.value }))}
+                  placeholder="Enter number of lines"
+                />
+              </div>
+              <div>
+                <Label htmlFor="grossWeight">Gross Weight <span className="text-xs font-normal text-muted-foreground">(optional)</span></Label>
+                <Input
+                  id="grossWeight"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.grossWeight}
+                  onChange={(e) => setFormData(prev => ({ ...prev, grossWeight: e.target.value }))}
+                  placeholder="Enter gross weight"
+                />
+              </div>
             </div>
           </div>
 

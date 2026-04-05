@@ -11,6 +11,24 @@ import { Loader2, Upload, X, Building2, FileText, CreditCard } from "lucide-reac
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
+const resolveStoredImageUrl = (value?: string) => {
+  if (!value) {
+    return "";
+  }
+
+  if (
+    value.startsWith("http://") ||
+    value.startsWith("https://") ||
+    value.startsWith("file://") ||
+    value.startsWith("data:") ||
+    value.startsWith("blob:")
+  ) {
+    return value;
+  }
+
+  return `${BASE_URL}${value}`;
+};
+
 export default function SettingsCompany() {
   const [form, setForm] = useState({
     companyName: "",
@@ -38,6 +56,7 @@ export default function SettingsCompany() {
   const [signaturePreview, setSignaturePreview] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [backupAction, setBackupAction] = useState<"backup" | "restore" | null>(null);
 
   useEffect(() => {
     loadCompany();
@@ -68,10 +87,10 @@ export default function SettingsCompany() {
         });
 
         if (data.logoUrl) {
-          setLogoPreview(`${BASE_URL}${data.logoUrl}`);
+          setLogoPreview(resolveStoredImageUrl(data.logoUrl));
         }
         if (data.signatureUrl) {
-          setSignaturePreview(`${BASE_URL}${data.signatureUrl}`);
+          setSignaturePreview(resolveStoredImageUrl(data.signatureUrl));
         }
       }
     } catch (error) {
@@ -213,6 +232,94 @@ export default function SettingsCompany() {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const backupData = async () => {
+    if (!window.electronAPI) {
+      toast({
+        title: "Desktop only",
+        description: "Backup is available only in the Electron desktop app",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setBackupAction("backup");
+      const result = await api.backupData();
+
+      if (result?.success) {
+        toast({
+          title: "Backup created",
+          description: result.path || "Database backup saved successfully",
+        });
+        return;
+      }
+
+      if (!result?.cancelled) {
+        toast({
+          title: "Backup failed",
+          description: result?.message || "Could not create backup",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Backup failed",
+        description: "Could not create backup",
+        variant: "destructive",
+      });
+    } finally {
+      setBackupAction(null);
+    }
+  };
+
+  const restoreData = async () => {
+    if (!window.electronAPI) {
+      toast({
+        title: "Desktop only",
+        description: "Restore is available only in the Electron desktop app",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Restoring will replace your current local database. Continue?"
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setBackupAction("restore");
+      const result = await api.restoreData();
+
+      if (result?.success) {
+        toast({
+          title: "Backup restored",
+          description: "Local database restored successfully",
+        });
+        await loadCompany();
+        return;
+      }
+
+      if (!result?.cancelled) {
+        toast({
+          title: "Restore failed",
+          description: result?.message || "Could not restore backup",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Restore failed",
+        description: "Could not restore backup",
+        variant: "destructive",
+      });
+    } finally {
+      setBackupAction(null);
     }
   };
 
@@ -548,6 +655,50 @@ export default function SettingsCompany() {
               placeholder="1. Goods once sold will not be taken back.&#10;2. Subject to Jaipur jurisdiction.&#10;3. E. & O.E."
               rows={4}
             />
+          </CardContent>
+        </Card>
+
+        {/* Data Backup / Restore */}
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle>Local Data Backup</CardTitle>
+            <CardDescription>
+              Export your local SQLite database and restore it when needed.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col md:flex-row gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={backupData}
+                disabled={backupAction !== null}
+              >
+                {backupAction === "backup" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating Backup...
+                  </>
+                ) : (
+                  "Backup Data"
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={restoreData}
+                disabled={backupAction !== null}
+              >
+                {backupAction === "restore" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Restoring Backup...
+                  </>
+                ) : (
+                  "Restore Data"
+                )}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

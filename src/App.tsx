@@ -75,7 +75,7 @@ const App = () => (
               <Route
                 path="/users"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={["admin"]}>
                     <Users />
                   </ProtectedRoute>
                 }
@@ -84,7 +84,7 @@ const App = () => (
               <Route
                 path="/settings/company"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={["admin"]}>
                     <SettingsCompany />
                   </ProtectedRoute>
                 }
@@ -93,7 +93,7 @@ const App = () => (
               <Route
                 path="/audit-logs"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={["admin"]}>
                     <AuditLogs />
                   </ProtectedRoute>
                 }
@@ -102,7 +102,7 @@ const App = () => (
               <Route
                 path="/analytics"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={["admin"]}>
                     <Analytics />
                   </ProtectedRoute>
                 }
@@ -110,7 +110,7 @@ const App = () => (
               <Route
                 path="/recycle-bin"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={["admin"]}>
                     <RecycleBin />
                   </ProtectedRoute>
                 }

@@ -21,6 +21,34 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({
   onOpenChange,
   item,
 }) => {
+  const getReferenceDisplay = (value: any, fallback = '-') => {
+    if (!value) return fallback;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed || fallback;
+    }
+
+    const name = String(value?.name || '').trim();
+    if (name) {
+      return name;
+    }
+
+    const id = String(value?._id || value?.id || '').trim();
+    return id || fallback;
+  };
+
+  const serialDisplay = (() => {
+    const explicit = String(item.serialNumber || '').trim();
+    if (explicit) {
+      return explicit;
+    }
+    const idToken = String(item._id || '')
+      .replace(/[^A-Za-z0-9]/g, '')
+      .toUpperCase()
+      .slice(-6);
+    return idToken ? `#${idToken}` : '-';
+  })();
+
   const getImageUrl = (imagePath: string): string => {
     if (!imagePath) return '';
     if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
@@ -33,19 +61,22 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({
   };
 
   const getStatusBadge = () => {
-    const isSold = item.availablePieces === 0 && item.availableWeight === 0;
-    const isPartial = item.availablePieces < item.totalPieces || item.availableWeight < item.totalWeight;
+    const normalizedStatus = item.status?.toString().trim().toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
 
-    if (isSold || item.status === 'sold') {
-      return <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-300">Sold</Badge>;
+    if (normalizedStatus === 'in_stock') {
+      return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">In Stock</Badge>;
     }
-    if (item.status === 'pending') {
+    if (normalizedStatus === 'pending') {
       return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">Pending</Badge>;
     }
-    if (isPartial || item.status === 'partially_sold') {
+    if (normalizedStatus === 'partially_sold') {
       return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">Partially Sold</Badge>;
     }
-    return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">In Stock</Badge>;
+    if (normalizedStatus === 'sold') {
+      return <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-300">Sold</Badge>;
+    }
+
+    return <Badge variant="outline" className="bg-muted text-muted-foreground border-muted-foreground/20">-</Badge>;
   };
 
   const getCuttingStyleDisplay = (code?: string) => {
@@ -104,7 +135,7 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
-            <span>{item.serialNumber}</span>
+            <span>{serialDisplay}</span>
             {getStatusBadge()}
           </DialogTitle>
         </DialogHeader>
@@ -119,7 +150,7 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({
                   <img
                     key={i}
                     src={getImageUrl(img)}
-                    alt={`${item.serialNumber}-${i}`}
+                    alt={`${serialDisplay}-${i}`}
                     className="w-24 h-24 object-cover rounded-md border"
                   />
                 ))}
@@ -132,13 +163,13 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({
             <p className="text-sm font-medium text-muted-foreground mb-2">QR Code</p>
             <div className="flex items-center gap-4">
               <QRCodeSVG
-                value={JSON.stringify({ id: item._id, sn: item.serialNumber })}
+                value={JSON.stringify({ id: item._id, sn: serialDisplay })}
                 size={100}
                 level="M"
               />
               <div className="text-xs text-muted-foreground">
                 <p>Scan to identify this item</p>
-                <p className="font-medium text-foreground">{item.serialNumber}</p>
+                <p className="font-medium text-foreground">{serialDisplay}</p>
               </div>
             </div>
           </div>
@@ -147,9 +178,9 @@ export const InventoryDetailModal: React.FC<InventoryDetailModalProps> = ({
           <div>
             <p className="text-sm font-semibold mb-3 border-b pb-1">Classification</p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <Field label="Category" value={item.category?.name} />
+              <Field label="Category" value={getReferenceDisplay(item.category, 'Uncategorized')} />
               <Field label="Cutting Style" value={getCuttingStyleDisplay(item.cuttingStyle)} />
-              <Field label="Series" value={item.series?.name} />
+              <Field label="Series" value={getReferenceDisplay(item.series)} />
               <Field label="Lot Type" value={item.shapeType === 'single' ? 'Single Shape' : 'Mix Shape'} />
             </div>
           </div>

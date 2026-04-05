@@ -88,7 +88,17 @@ export const Inventory = () => {
     try {
       const response = await api.getCategories();
       if (response.success) {
-        setCategories(Array.isArray(response.data) ? response.data : []);
+        const normalized = Array.isArray(response.data)
+          ? response.data
+              .map((category: any) => {
+                const id = String(category?._id || category?.id || '').trim();
+                const name = String(category?.name || '').trim();
+                if (!id || !name) return null;
+                return { _id: id, name };
+              })
+              .filter(Boolean) as { _id: string; name: string }[]
+          : [];
+        setCategories(normalized);
       }
     } catch (error) {
       console.error("Error fetching categories:", error);
@@ -113,7 +123,17 @@ export const Inventory = () => {
     try {
       const response = await api.getSeries({ limit: 100 });
       if (response.success) {
-        setSeriesList(response.data);
+        const normalized = Array.isArray(response.data)
+          ? response.data
+              .map((series: any) => {
+                const id = String(series?._id || series?.id || '').trim();
+                const name = String(series?.name || '').trim();
+                if (!id || !name) return null;
+                return { _id: id, name };
+              })
+              .filter(Boolean) as SeriesItem[]
+          : [];
+        setSeriesList(normalized);
       }
     } catch (error) {
       console.error("Error fetching series:", error);
@@ -170,6 +190,16 @@ export const Inventory = () => {
   // Fetch inventory
   useEffect(() => {
     fetchInventory();
+  }, [fetchInventory]);
+
+  // Refresh when other pages mutate desktop data (sell/undo/create/update/delete).
+  useEffect(() => {
+    const handleDataChanged = () => {
+      fetchInventory();
+    };
+
+    window.addEventListener("kuber-data-changed", handleDataChanged);
+    return () => window.removeEventListener("kuber-data-changed", handleDataChanged);
   }, [fetchInventory]);
 
   const handleSort = (field: string) => {
@@ -229,12 +259,17 @@ export const Inventory = () => {
 
   const handleExport = async () => {
     try {
-      await api.exportInventoryExcel(getFilterParams());
-      toast.success(
-        hasActiveFilters
-          ? `Exported ${totalItems} filtered items`
-          : "All inventory exported"
-      );
+      const result: any = await api.exportInventoryExcel(getFilterParams());
+      if (result?.success) {
+        const message = result?.path
+          ? `Saved: ${result.path}`
+          : hasActiveFilters
+            ? `Exported ${totalItems} filtered items`
+            : "All inventory exported";
+        toast.success(message);
+      } else if (!result?.cancelled) {
+        toast.error(result?.message || "Failed to export inventory");
+      }
     } catch (error) {
       console.error("Error exporting:", error);
       toast.error("Failed to export inventory");
@@ -288,12 +323,17 @@ export const Inventory = () => {
               onClick={async () => {
                 try {
                   const params = getFilterParams();
-                  await api.exportInventoryExcelWithQR(params);
-                  toast.success(
-                    hasActiveFilters
-                      ? `Exported ${totalItems} items with QR codes`
-                      : "All inventory exported with QR codes"
-                  );
+                  const result: any = await api.exportInventoryExcelWithQR(params);
+                  if (result?.success) {
+                    const message = result?.path
+                      ? `Saved: ${result.path}`
+                      : hasActiveFilters
+                        ? `Exported ${totalItems} items with QR codes`
+                        : "All inventory exported with QR codes";
+                    toast.success(message);
+                  } else if (!result?.cancelled) {
+                    toast.error(result?.message || "Failed to export with QR codes");
+                  }
                 } catch {
                   toast.error("Failed to export with QR codes");
                 }
@@ -333,8 +373,12 @@ export const Inventory = () => {
               onClick={async () => {
                 try {
                   const params = getFilterParams();
-                  await api.downloadQRLabelsPDF(params);
-                  toast.success("QR labels PDF downloaded");
+                  const result: any = await api.downloadQRLabelsPDF(params);
+                  if (result?.success) {
+                    toast.success(result?.path ? `Saved: ${result.path}` : "QR labels PDF downloaded");
+                  } else if (!result?.cancelled) {
+                    toast.error(result?.message || "Failed to download QR labels");
+                  }
                 } catch {
                   toast.error("Failed to download QR labels");
                 }
@@ -379,6 +423,7 @@ export const Inventory = () => {
               ref={csvInputRef}
               type="file"
               accept=".csv"
+              aria-label="Import inventory CSV file"
               onChange={handleCSVImport}
               className="hidden"
             />
@@ -587,6 +632,7 @@ export const Inventory = () => {
               fetchSeries();
             }}
             categories={categories}
+            seriesList={seriesList}
             sortBy={sortBy}
             sortOrder={sortOrder}
             onSort={handleSort}
@@ -603,6 +649,7 @@ export const Inventory = () => {
               fetchSeries();
             }}
             categories={categories}
+            seriesList={seriesList}
           />
         )}
 

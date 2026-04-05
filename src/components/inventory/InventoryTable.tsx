@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Edit, Trash2, ShoppingCart, Merge, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { InventoryItem, Category, CUTTING_STYLES, CuttingStyleCode } from '@/types/inventory';
+import { InventoryItem, Category, Series, CUTTING_STYLES, CuttingStyleCode } from '@/types/inventory';
 import { AddInventoryDialog } from './AddInventoryDialog';
 import { SellInventoryDialog } from './SellInventoryDialog';
 import { MergePacketDialog } from './MergePacketDialog';
@@ -15,6 +15,7 @@ interface InventoryTableProps {
   loading: boolean;
   onRefresh: () => void;
   categories?: Category[];
+  seriesList?: Series[];
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   onSort?: (field: string) => void;
@@ -25,6 +26,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
   loading,
   onRefresh,
   categories = [],
+  seriesList = [],
   sortBy = 'createdAt',
   sortOrder = 'desc',
   onSort
@@ -46,7 +48,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
       return;
     }
 
-    if (!confirm(`Are you sure you want to delete item ${item.serialNumber}?`)) {
+    if (!confirm(`Are you sure you want to delete item ${getSerialDisplay(item)}?`)) {
       return;
     }
 
@@ -70,19 +72,222 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
     }
   };
 
-  const getStatusBadge = (item: InventoryItem) => {
-    const isSold = item.availablePieces === 0 && item.availableWeight === 0;
-    const isPartial = item.availablePieces < item.totalPieces || item.availableWeight < item.totalWeight;
+  const normalizeStatus = (status?: string) => {
+    if (!status) return '';
+    return status.toString().trim().toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+  };
 
-    if (isSold || item.status === 'sold') {
+  const getReferenceId = (value: any): string => {
+    if (!value) return '';
+    if (typeof value === 'string') return value.trim();
+    return String(value?._id || value?.id || '').trim();
+  };
+
+  const getReferenceName = (value: any): string => {
+    if (!value || typeof value === 'string') return '';
+    return String(value?.name || '').trim();
+  };
+
+  const getCategoryLabel = (item: InventoryItem) => {
+    const directName = getReferenceName(item.category);
+    if (directName) {
+      return directName;
+    }
+
+    const categoryId = getReferenceId(item.category);
+    if (!categoryId) {
+      return 'Uncategorized';
+    }
+
+    const match = categories.find((category) => {
+      const id = String((category as any)?._id || (category as any)?.id || '').trim();
+      return id === categoryId;
+    });
+
+    return match?.name || 'Uncategorized';
+  };
+
+  const getSeriesLabel = (item: InventoryItem) => {
+    const directName = getReferenceName(item.series);
+    if (directName) {
+      return directName;
+    }
+
+    const seriesId = getReferenceId(item.series);
+    if (!seriesId) {
+      return '-';
+    }
+
+    const match = seriesList.find((series) => {
+      const id = String((series as any)?._id || (series as any)?.id || '').trim();
+      return id === seriesId;
+    });
+
+    return match?.name || '-';
+  };
+
+  const getSerialDisplay = (item: InventoryItem) => {
+    const explicit = String(item.serialNumber || '').trim();
+    if (explicit) {
+      return explicit;
+    }
+
+    const idToken = String(item._id || (item as any).id || '')
+      .replace(/[^A-Za-z0-9]/g, '')
+      .toUpperCase()
+      .slice(-6);
+    return idToken ? `#${idToken}` : '-';
+  };
+
+  const toNumber = (value: unknown): number | null => {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = typeof value === 'number' ? value : Number.parseFloat(String(value));
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const hasDimension = (point?: { length?: number; width?: number }) => {
+    return (point?.length || 0) > 0 || (point?.width || 0) > 0;
+  };
+
+  const formatDimensionNumber = (value: number) => {
+    if (!Number.isFinite(value)) return '0';
+    return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
+  };
+
+  const formatDimensionPoint = (point?: { length?: number; width?: number }) => {
+    if (!hasDimension(point)) return 'N/A';
+    const length = (point?.length || 0) > 0 ? formatDimensionNumber(point!.length!) : '?';
+    const width = (point?.width || 0) > 0 ? formatDimensionNumber(point!.width!) : '?';
+    return `${length}x${width}`;
+  };
+
+  const getByPath = (source: any, path: string): unknown => {
+    return path.split('.').reduce((acc: any, key: string) => (acc == null ? undefined : acc[key]), source);
+  };
+
+  const parseDimensionText = (value: unknown): { length: number; width: number } | null => {
+    if (typeof value !== 'string') return null;
+    const match = value.trim().match(/^(\d+(?:\.\d+)?)\s*[xX]\s*(\d+(?:\.\d+)?)$/);
+    if (!match) return null;
+    return {
+      length: Number.parseFloat(match[1]),
+      width: Number.parseFloat(match[2]),
+    };
+  };
+
+  const firstNumericValue = (source: any, paths: string[]): number | null => {
+    for (const path of paths) {
+      const parsed = toNumber(getByPath(source, path));
+      if (parsed !== null) {
+        return parsed;
+      }
+    }
+    return null;
+  };
+
+  const getDimensionPoint = (source: any, pointType: 'min' | 'max') => {
+    const isMin = pointType === 'min';
+    const objectPaths = isMin
+      ? ['dimensions.min', 'dimensionMin', 'dimMin', 'minDimension']
+      : ['dimensions.max', 'dimensionMax', 'dimMax', 'maxDimension'];
+    const lengthPaths = isMin
+      ? ['dimMinLength', 'dimensionMinLength', 'minLength', 'dimension_min_length']
+      : ['dimMaxLength', 'dimensionMaxLength', 'maxLength', 'dimension_max_length'];
+    const widthPaths = isMin
+      ? ['dimMinWidth', 'dimensionMinWidth', 'minWidth', 'dimension_min_width']
+      : ['dimMaxWidth', 'dimensionMaxWidth', 'maxWidth', 'dimension_max_width'];
+
+    for (const objectPath of objectPaths) {
+      const value = getByPath(source, objectPath);
+      if (value && typeof value === 'object') {
+        const length = toNumber((value as any).length);
+        const width = toNumber((value as any).width);
+        if (length !== null || width !== null) {
+          return {
+            length: length || 0,
+            width: width || 0,
+          };
+        }
+      }
+
+      const parsedText = parseDimensionText(value);
+      if (parsedText) {
+        return parsedText;
+      }
+    }
+
+    const length = firstNumericValue(source, lengthPaths);
+    const width = firstNumericValue(source, widthPaths);
+
+    return {
+      length: length || 0,
+      width: width || 0,
+    };
+  };
+
+  const getDimensionRange = (source: any) => {
+    const min = getDimensionPoint(source, 'min');
+    const max = getDimensionPoint(source, 'max');
+
+    if (!hasDimension(min) && !hasDimension(max)) {
+      const legacyLength = firstNumericValue(source, ['dimensions.length', 'dimensionLength', 'dimLength']);
+      const legacyWidth = firstNumericValue(source, ['dimensions.width', 'dimensionWidth', 'dimWidth']);
+      if ((legacyLength || 0) > 0 || (legacyWidth || 0) > 0) {
+        return {
+          min: { length: legacyLength || 0, width: legacyWidth || 0 },
+          max: { length: legacyLength || 0, width: legacyWidth || 0 },
+        };
+      }
+    }
+
+    return { min, max };
+  };
+
+  const getMixOverallRange = (item: InventoryItem) => {
+    const shapes = Array.isArray(item.shapes) ? item.shapes : [];
+    if (shapes.length === 0) return null;
+
+    const minLengths: number[] = [];
+    const minWidths: number[] = [];
+    const maxLengths: number[] = [];
+    const maxWidths: number[] = [];
+
+    for (const shape of shapes) {
+      const range = getDimensionRange(shape as any);
+      if ((range.min.length || 0) > 0) minLengths.push(range.min.length);
+      if ((range.min.width || 0) > 0) minWidths.push(range.min.width);
+      if ((range.max.length || 0) > 0) maxLengths.push(range.max.length);
+      if ((range.max.width || 0) > 0) maxWidths.push(range.max.width);
+    }
+
+    const min = {
+      length: minLengths.length ? Math.min(...minLengths) : 0,
+      width: minWidths.length ? Math.min(...minWidths) : 0,
+    };
+    const max = {
+      length: maxLengths.length ? Math.max(...maxLengths) : 0,
+      width: maxWidths.length ? Math.max(...maxWidths) : 0,
+    };
+
+    if (!hasDimension(min) && !hasDimension(max)) {
+      return null;
+    }
+
+    return { min, max };
+  };
+
+  const getStatusBadge = (item: InventoryItem) => {
+    const normalizedStatus = normalizeStatus(item.status);
+
+    if (normalizedStatus === 'in_stock') {
       return (
-        <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-300">
-          Sold
+        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
+          In Stock
         </Badge>
       );
     }
 
-    if (item.status === 'pending') {
+    if (normalizedStatus === 'pending') {
       return (
         <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">
           Pending
@@ -90,7 +295,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
       );
     }
 
-    if (isPartial || item.status === 'partially_sold') {
+    if (normalizedStatus === 'partially_sold') {
       return (
         <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
           Partially Sold
@@ -98,9 +303,17 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
       );
     }
 
+    if (normalizedStatus === 'sold') {
+      return (
+        <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-300">
+          Sold
+        </Badge>
+      );
+    }
+
     return (
-      <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
-        In Stock
+      <Badge variant="outline" className="bg-muted text-muted-foreground border-muted-foreground/20">
+        -
       </Badge>
     );
   };
@@ -135,19 +348,23 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
   };
 
   const formatDimensions = (item: InventoryItem) => {
-    if (!item.dimensions) return 'N/A';
-    const { min, max, unit } = item.dimensions;
-    const hasMin = (min?.length || 0) > 0 || (min?.width || 0) > 0;
-    const hasMax = (max?.length || 0) > 0 || (max?.width || 0) > 0;
-    if (!hasMin && !hasMax) return 'N/A';
+    const range = item.shapeType === 'mix'
+      ? (getMixOverallRange(item) || getDimensionRange(item as any))
+      : getDimensionRange(item as any);
 
-    const parts = [];
-    if (hasMin) parts.push(`${min.length}x${min.width}`);
-    if (hasMax) parts.push(`${max.length}x${max.width}`);
-    return parts.join(' - ') + ` ${unit || 'mm'}`;
+    const hasMin = hasDimension(range.min);
+    const hasMax = hasDimension(range.max);
+
+    if (!hasMin && !hasMax) return 'N/A';
+    if (hasMin && hasMax) return `${formatDimensionPoint(range.min)} - ${formatDimensionPoint(range.max)}`;
+    return hasMin ? formatDimensionPoint(range.min) : formatDimensionPoint(range.max);
   };
 
   const canSell = (item: InventoryItem) => {
+    const normalizedStatus = normalizeStatus(item.status);
+    if (normalizedStatus === 'sold') {
+      return false;
+    }
     return item.availablePieces > 0 || item.availableWeight > 0;
   };
 
@@ -232,6 +449,12 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-sm">
                   Dimensions
                 </th>
+                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-sm">
+                  Lines
+                </th>
+                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-sm">
+                  Gross Wt
+                </th>
                 <SortableHeader field="purchaseCode">Purchase Price</SortableHeader>
                 <SortableHeader field="saleCode">Sale Price</SortableHeader>
                 <SortableHeader field="status">Status</SortableHeader>
@@ -247,16 +470,16 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                   className="border-b transition-colors hover:bg-muted/50"
                 >
                   <td className="p-4 align-middle font-medium">
-                    {item.serialNumber}
+                    {getSerialDisplay(item)}
                   </td>
                   <td className="p-4 align-middle">
-                    {item.category?.name || 'N/A'}
+                    {getCategoryLabel(item)}
                   </td>
                   <td className="p-4 align-middle text-sm">
                     {getCuttingStyleDisplay(item.cuttingStyle)}
                   </td>
                   <td className="p-4 align-middle text-sm">
-                    {item.series?.name || '-'}
+                    {getSeriesLabel(item)}
                   </td>
                   <td className="p-4 align-middle">
                     {renderShapes(item)}
@@ -277,6 +500,12 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                   </td>
                   <td className="p-4 align-middle text-sm text-muted-foreground">
                     {formatDimensions(item)}
+                  </td>
+                  <td className="p-4 align-middle text-sm">
+                    {item.lines || '-'}
+                  </td>
+                  <td className="p-4 align-middle text-sm">
+                    {item.grossWeight ? Number(item.grossWeight).toFixed(2) : '-'}
                   </td>
                   <td className="p-4 align-middle">
                     {item.purchaseCode ? item.purchaseCode : '-'}
